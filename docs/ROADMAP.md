@@ -45,7 +45,7 @@ Status: in progress
 
 | Decision | Why |
 | --- | --- |
-| SQLite on a laptop, PostgreSQL deployed | Nobody has to install a database to run the project, and the deployed site still gets real types and real constraints. The cost is that two paths exist. CI runs the API against real PostgreSQL on every push so they cannot drift apart |
+| PostgreSQL, not a document store | The data is three tables with clear relationships between them, which is exactly what a relational database is for. Real types and real constraints also mean the database refuses bad data instead of trusting our code to be careful |
 | No Docker | One more tool to install, and the team is on Windows laptops where it is heavy. A setup script against a normal PostgreSQL install does the same job in a way everyone can read |
 | No login | Authentication proves nothing about ranking, which is what is graded |
 | No real blockchain | A Merkle tree and a hash chain show the same property without a network |
