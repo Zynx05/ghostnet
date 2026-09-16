@@ -1,150 +1,334 @@
 /* ghostnet.css
-   The few pieces the copied design system does not already cover.
-   Everything here uses the tokens from globals.css, so nothing hardcodes a
-   colour and the whole app restyles from one place. */
+   The whole look of the app in one file.
+   Soft grey page, white cards, one blue for actions. Nothing else is coloured
+   unless the colour means something, like a red plagiarism badge. */
 
-.sidebar-brand-sub {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin-top: 2px;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f4f2ee;
+  --surface:   #ffffff;
+  --line:      #e0dfdc;
+  --text:      #1d1d1d;
+  --muted:     #666666;
+  --faint:     #8c8c8c;
+  --blue:      #0a66c2;
+  --blue-dark: #004182;
+  --blue-soft: #e8f0fe;
+  --good:      #057642;
+  --good-soft: #e6f4ea;
+  --bad:       #b3261e;
+  --bad-soft:  #fce8e6;
+  --radius:    10px;
+  --shadow:    0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.06);
+  --font:      -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono:      ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 
-.nav-link-note {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-faint);
-  text-transform: none;
+html { background: var(--bg); }
+
+body {
+  font-family: var(--font);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+
+.topnav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topnav-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 16px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--blue);
+  letter-spacing: -0.02em;
+  margin-right: auto;
+}
+
+.brand span {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--faint);
+  margin-left: 8px;
   letter-spacing: 0;
 }
 
-.nav-link[aria-current="page"] .nav-link-note { color: var(--accent-ink); opacity: 0.7; }
-
-.sidebar-foot {
-  margin-top: auto;
-  padding: 0.9rem;
-  border-top: 2px solid var(--border);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1.6;
-  color: var(--text-faint);
+.topnav-link {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 15px 2px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
 }
 
-/* A label above a value, used for the algorithm name over a score. */
-.algo-tag {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-faint);
+.topnav-link:hover { color: var(--text); }
+.topnav-link[aria-current="page"] { color: var(--text); border-bottom-color: var(--text); }
+
+/* ── Page ────────────────────────────────────────────────────────────── */
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-title { font-size: 20px; font-weight: 600; line-height: 1.3; }
+.page-subtitle { color: var(--muted); margin-top: 2px; }
+
+.back-link { font-size: 13px; color: var(--muted); }
+.back-link:hover { color: var(--blue); text-decoration: underline; }
+
+/* ── Cards ───────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 20px;
   display: block;
 }
 
-/* Marks which member owns the thing on screen. Handy during the viva. */
-.owner {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border: 2px solid var(--border);
-  padding: 2px 6px;
-  background: var(--bg-2);
-  white-space: nowrap;
-}
+a.card:hover { box-shadow: 0 0 0 1px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08); }
+
+.card-title { font-weight: 600; font-size: 15px; }
+.card-meta { color: var(--muted); font-size: 13px; }
+.card-body { margin-top: 8px; color: var(--text); }
 
 .row-between {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-.stack { display: flex; flex-direction: column; gap: 1.25rem; }
-.cluster { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.cluster { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+
+.btn {
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid var(--blue);
+  color: var(--blue);
+  background: transparent;
+  transition: background 0.1s;
+}
+
+.btn:hover { background: var(--blue-soft); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.btn-accent { background: var(--blue); color: #fff; }
+.btn-accent:hover { background: var(--blue-dark); }
+
+.btn-ghost { border-color: transparent; color: var(--muted); }
+.btn-ghost:hover { background: #f0f0f0; color: var(--text); }
+
+/* ── Forms ───────────────────────────────────────────────────────────── */
+
+.field { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.field-label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.field-hint { font-size: 12px; color: var(--faint); }
+
+.field-input, .field-textarea {
+  border: 1px solid #b0b0b0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+  width: 100%;
+}
+
+.field-textarea { resize: vertical; min-height: 90px; font-family: var(--mono); font-size: 13px; }
+.field-input:focus, .field-textarea:focus { outline: 2px solid var(--blue); outline-offset: -1px; border-color: var(--blue); }
+
+/* ── Badges and tags ─────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f0f0f0;
+  color: var(--muted);
+}
+
+.badge-good { background: var(--good-soft); color: var(--good); }
+.badge-bad { background: var(--bad-soft); color: var(--bad); }
+.badge-accent { background: var(--blue-soft); color: var(--blue); }
+
+/* Small grey label above a value. */
+.algo-tag {
+  display: block;
+  font-size: 11px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Marks which member owns the thing on screen. Useful during the viva. */
+.owner {
+  font-size: 11px;
+  color: var(--faint);
+  background: #f0f0f0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+/* ── Feedback ────────────────────────────────────────────────────────── */
+
+.flash {
+  background: var(--good-soft);
+  color: var(--good);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 13px;
+}
+
+.flash-err { background: var(--bad-soft); color: var(--bad); }
+
+.empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 28px 16px;
+}
+
+.empty-title { font-weight: 600; color: var(--text); }
+.empty-desc { font-size: 13px; margin-top: 4px; }
+
+.skeleton {
+  height: 14px;
+  background: #e8e8e8;
+  border-radius: 4px;
+  margin: 10px 0;
+  animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse { 50% { opacity: 0.5; } }
+
+/* ── Stat tiles ──────────────────────────────────────────────────────── */
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.tile { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; }
+.tile-label { font-size: 12px; color: var(--muted); }
+.tile-value { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.tile-note { font-size: 12px; color: var(--faint); margin-top: 2px; }
+.tile-attn .tile-value { color: var(--bad); }
+
+/* ── Table ───────────────────────────────────────────────────────────── */
+
+.table-wrap { overflow-x: auto; margin-top: 12px; }
+
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.data th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.data td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.data tbody tr:last-child td { border-bottom: none; }
+table.data tbody tr:hover { background: #fafafa; }
+table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
+table.data th.sortable { cursor: pointer; }
+table.data th.sortable:hover { color: var(--blue); }
+
+/* ── Code and hashes ─────────────────────────────────────────────────── */
 
 .code-block {
-  font-family: var(--font-mono);
+  font-family: var(--mono);
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
-  background: var(--bg-2);
-  border: 2px solid var(--border);
-  padding: 0.75rem;
-  max-height: 220px;
+  background: #f7f7f5;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  max-height: 200px;
   overflow: auto;
 }
 
-.hash {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  word-break: break-all;
-  color: var(--text-muted);
-}
+.hash { font-family: var(--mono); font-size: 11px; word-break: break-all; color: var(--muted); }
 
-/* The winner card after the reveal. Inverted, because it is the one moment
-   in the flow where anonymity ends. */
+/* ── Winner ──────────────────────────────────────────────────────────── */
+
 .winner {
-  border: 2px solid var(--border);
-  background: var(--text);
-  color: var(--bg);
-  padding: 1rem 1.25rem;
-  box-shadow: var(--shadow);
+  background: var(--blue);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 18px 20px;
 }
 
-.winner .algo-tag { color: var(--bg); opacity: 0.7; }
-.winner-name { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+.winner .algo-tag { color: rgba(255,255,255,0.75); }
+.winner-name { font-size: 24px; font-weight: 700; margin-top: 2px; }
+.winner-score { font-size: 13px; opacity: 0.85; margin-top: 4px; }
 
-/* The timeline used by the greedy scheduling page. */
-.timeline-bar {
-  position: relative;
-  height: 26px;
-  background: var(--bg-2);
-  border: 2px solid var(--border);
-  margin-bottom: 0.4rem;
-}
+/* ── Schedule timeline ───────────────────────────────────────────────── */
+
+.timeline-bar { position: relative; height: 26px; background: #ededea; border-radius: 6px; margin-top: 4px; }
 
 .timeline-span {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-right: 2px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 6px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  white-space: nowrap;
-  overflow: hidden;
+  position: absolute; top: 0; bottom: 0;
+  border-radius: 6px;
+  display: flex; align-items: center;
+  padding: 0 8px;
+  font-size: 11px; font-weight: 600;
+  white-space: nowrap; overflow: hidden;
 }
 
 .timeline-span-chosen { background: var(--good); color: #fff; }
-.timeline-span-dropped { background: var(--bg-3); color: var(--text-muted); }
+.timeline-span-dropped { background: #cfcfcb; color: var(--muted); }
 
-.bar-track {
-  height: 8px;
-  background: var(--bg-3);
-  border: 2px solid var(--border);
-  min-width: 60px;
-}
+/* ── Proposal log ────────────────────────────────────────────────────── */
 
-.bar-fill { height: 100%; background: var(--text); }
-.bar-fill-bad { background: var(--bad); }
+.log-list { list-style: none; counter-reset: step; font-size: 13px; line-height: 1.9; margin-top: 8px; }
+.log-list li::before { counter-increment: step; content: counter(step) ". "; color: var(--faint); }
 
-.log-list {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.8;
-  list-style: none;
-  counter-reset: step;
-}
+.pref { margin-top: 8px; }
+.pref-order { font-family: var(--mono); font-size: 12px; }
 
-.log-list li::before {
-  counter-increment: step;
-  content: counter(step) ". ";
-  color: var(--text-faint);
+@media (max-width: 600px) {
+  .topnav-inner { gap: 12px; }
+  .brand span { display: none; }
+  .page-title { font-size: 18px; }
 }

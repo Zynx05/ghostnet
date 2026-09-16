@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * Member 7  Blockchain Developer.
- * Every revealed win, linked block by block. Each block carries the hash of the
- * one before it, so editing an old win breaks every hash that follows.
- */
-
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { ChainBlock } from '../../lib/types';
@@ -24,56 +18,43 @@ export default function ChainPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Skill Proof chain</h1>
-      <p className="page-subtitle">
-        A profile is not a list of universities. It is this chain, and every
-        block in it was earned by winning a challenge under a ghost name.
-      </p>
+      <section className="card">
+        <h1 className="page-title">Verified wins</h1>
+        <div className="card-meta">
+          Every win is recorded and linked to the one before it. Nobody can edit an old
+          win without it showing.
+        </div>
+      </section>
 
       <Flash message={flash} />
 
       <div className="tile-grid">
         <StatTile label="Verified wins" value={blocks?.length ?? 0} />
-        <StatTile label="Hash function" value="SHA 256" note="64 hex characters" />
-        <StatTile label="Proof size" value="O(log n)" note="siblings on the path" />
+        <StatTile label="Record" value={root ? root.slice(0, 10) + '…' : '—'} note="fingerprint of every win" />
       </div>
 
       {blocks !== null && blocks.length === 0 && (
-        <EmptyState
-          title="The chain is empty"
-          description="Rank a challenge and reveal its winner, then come back here."
-        />
+        <div className="card">
+          <EmptyState title="No wins yet" description="Rank a challenge and reveal its winner." />
+        </div>
       )}
 
-      {root && (
-        <section className="card">
-          <div className="card-title">Merkle root over every win</div>
-          <div className="hash" style={{ marginTop: '0.4rem' }}>{root}</div>
-          <div className="card-meta" style={{ marginTop: '0.5rem' }}>
-            One value that stands for the whole list. Change any win and this changes.
+      {(blocks ?? []).map(b => (
+        <section key={b.index} className="card">
+          <div className="row-between">
+            <div className="card-title">{b.record}</div>
+            <span className="badge badge-good">Verified</span>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <span className="algo-tag">Record id</span>
+            <div className="hash">{b.hash}</div>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <span className="algo-tag">Linked to</span>
+            <div className="hash">{b.previous_hash}</div>
           </div>
         </section>
-      )}
-
-      <div className="stack">
-        {(blocks ?? []).map(b => (
-          <section key={b.index} className="card">
-            <div className="row-between">
-              <div className="card-title">Block {b.index}</div>
-              <span className="owner">sha 256</span>
-            </div>
-            <p style={{ marginTop: '0.4rem' }}>{b.record}</p>
-            <div style={{ marginTop: '0.6rem' }}>
-              <span className="algo-tag">previous hash</span>
-              <div className="hash">{b.previous_hash}</div>
-            </div>
-            <div style={{ marginTop: '0.5rem' }}>
-              <span className="algo-tag">this block hash</span>
-              <div className="hash">{b.hash}</div>
-            </div>
-          </section>
-        ))}
-      </div>
+      ))}
     </div>
   );
 }

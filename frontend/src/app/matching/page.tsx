@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * Member 8  Product Manager.
- * Gale Shapley on a table small enough to trace on the whiteboard.
- * The proposal log is shown on purpose, because the log is the explanation.
- */
-
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import type { MatchResponse } from '../../lib/types';
@@ -37,78 +31,64 @@ export default function MatchingPage() {
 
   return (
     <div className="page">
-      <div className="row-between">
-        <div>
-          <h1 className="page-title">Matching</h1>
-          <p className="page-subtitle">
-            Winners and companies both have preferences. Gale Shapley pairs them so
-            that no candidate and company would rather have each other.
-          </p>
+      <section className="card">
+        <div className="row-between">
+          <div>
+            <h1 className="page-title">Matches</h1>
+            <div className="card-meta">
+              Winners rank the companies. Companies rank the winners. Everyone gets a
+              match nobody would trade away.
+            </div>
+          </div>
+          <button className="btn btn-accent" onClick={run}>Find matches</button>
         </div>
-        <button className="btn btn-accent" onClick={run}>Run matching</button>
-      </div>
+      </section>
 
       <Flash message={flash} />
 
-      <div className="cluster" style={{ alignItems: 'flex-start' }}>
-        <section className="card" style={{ flex: 1, minWidth: 260 }}>
-          <div className="card-title">Candidate preferences</div>
+      <div className="cluster" style={{ alignItems: 'stretch' }}>
+        <section className="card" style={{ flex: 1, minWidth: 240 }}>
+          <div className="card-title">Candidates want</div>
           {Object.entries(CANDIDATES).map(([who, order]) => (
-            <div key={who} style={{ marginTop: '0.5rem' }}>
+            <div key={who} className="pref">
               <span className="algo-tag">{who}</span>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                {order.join(' then ')}
-              </div>
+              <div className="pref-order">{order.join(' › ')}</div>
             </div>
           ))}
         </section>
-
-        <section className="card" style={{ flex: 1, minWidth: 260 }}>
-          <div className="card-title">Company preferences</div>
+        <section className="card" style={{ flex: 1, minWidth: 240 }}>
+          <div className="card-title">Companies want</div>
           {Object.entries(COMPANIES).map(([who, order]) => (
-            <div key={who} style={{ marginTop: '0.5rem' }}>
+            <div key={who} className="pref">
               <span className="algo-tag">{who}</span>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                {order.join(' then ')}
-              </div>
+              <div className="pref-order">{order.join(' › ')}</div>
             </div>
           ))}
         </section>
       </div>
 
-      {!result && (
-        <EmptyState
-          title="Not run yet"
-          description="Press Run matching to see the proposals and the final pairing."
-        />
-      )}
-
-      {result && (
+      {!result ? (
+        <div className="card"><EmptyState title="No matches yet" description="Press Find matches." /></div>
+      ) : (
         <>
           <section className="card">
-            <div className="row-between">
-              <div className="card-title">Stable pairing</div>
-              <span className="owner">gale shapley  O(n squared)</span>
-            </div>
-            <div className="table-wrap" style={{ marginTop: '0.75rem' }}>
+            <div className="card-title">Matches</div>
+            <div className="table-wrap">
               <table className="data">
-                <thead>
-                  <tr><th>Company</th><th>Candidate</th></tr>
-                </thead>
+                <thead><tr><th>Company</th><th>Candidate</th></tr></thead>
                 <tbody>
                   {result.pairs.map(p => (
                     <tr key={p.company}>
                       <td>{p.company}</td>
-                      <td style={{ fontFamily: 'var(--font-mono)' }}>{p.candidate}</td>
+                      <td style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>{p.candidate}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </section>
-
           <section className="card">
-            <div className="card-title">What happened, proposal by proposal</div>
+            <div className="card-title">How it was decided</div>
             <ol className="log-list">
               {result.log.map((line, i) => <li key={i}>{line}</li>)}
             </ol>

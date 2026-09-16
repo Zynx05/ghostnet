@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * Member 9  UI and UX Designer.
- * Greedy interval scheduling, drawn on a timeline so the greedy choice is
- * something the examiner can see rather than something we claim.
- */
-
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { ScheduleResponse, Window } from '../../lib/types';
@@ -23,7 +17,7 @@ export default function SchedulePage() {
     return (
       <div className="page">
         <Flash message={flash} />
-        <EmptyState title="Loading" description="The backend must be running on port 8000." />
+        <div className="card"><EmptyState title="Loading" /></div>
       </div>
     );
   }
@@ -33,20 +27,19 @@ export default function SchedulePage() {
 
   function bar(w: Window) {
     const left = (w.start / span) * 100;
-    const width = Math.max(6, ((w.end - w.start) / span) * 100);
+    const width = Math.max(8, ((w.end - w.start) / span) * 100);
     const picked = chosen.has(w.title);
     return (
-      <div key={w.title} style={{ marginBottom: '0.75rem' }}>
-        <span className="algo-tag">
-          {w.title}  day {w.start} to {w.end}  {picked ? 'kept' : 'dropped'}
-        </span>
+      <div key={w.title} style={{ marginTop: 12 }}>
+        <div className="row-between">
+          <span style={{ fontSize: 13 }}>{w.title}</span>
+          <span className="card-meta">day {w.start} to {w.end} · {picked ? 'scheduled' : 'clashes'}</span>
+        </div>
         <div className="timeline-bar">
           <div
             className={picked ? 'timeline-span timeline-span-chosen' : 'timeline-span timeline-span-dropped'}
             style={{ left: `${left}%`, width: `${width}%` }}
-          >
-            {w.title}
-          </div>
+          />
         </div>
       </div>
     );
@@ -54,38 +47,25 @@ export default function SchedulePage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Challenge windows</h1>
-      <p className="page-subtitle">
-        Two challenges cannot run at once without splitting the audience, so the
-        calendar takes the window that finishes earliest and repeats.
-      </p>
+      <section className="card">
+        <h1 className="page-title">Calendar</h1>
+        <div className="card-meta">
+          Two challenges at once split the audience, so the calendar fits in as many as it can
+          without overlap.
+        </div>
+      </section>
 
       <Flash message={flash} />
 
       <div className="tile-grid">
-        <StatTile label="Windows offered" value={data.sorted_by_finish.length} />
-        <StatTile label="Windows kept" value={data.chosen.length} note="greedy choice" />
-        <StatTile
-          label="Windows dropped"
-          value={data.dropped.length}
-          tone={data.dropped.length ? 'attn' : undefined}
-          note="they overlap something already kept"
-        />
+        <StatTile label="Proposed" value={data.sorted_by_finish.length} />
+        <StatTile label="Scheduled" value={data.chosen.length} />
+        <StatTile label="Clashing" value={data.dropped.length} tone={data.dropped.length ? 'attn' : undefined} />
       </div>
 
       <section className="card">
-        <div className="row-between">
-          <div>
-            <div className="card-title">Sorted by finishing time</div>
-            <div className="card-meta">
-              The sort is the whole cost of this algorithm, which is why it is O(n log n).
-            </div>
-          </div>
-          <span className="owner">greedy intervals</span>
-        </div>
-        <div style={{ marginTop: '1rem' }}>
-          {data.sorted_by_finish.map(bar)}
-        </div>
+        <div className="card-title">Timeline</div>
+        {data.sorted_by_finish.map(bar)}
       </section>
     </div>
   );
