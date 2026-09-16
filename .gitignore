@@ -6,6 +6,6 @@ node_modules/
 *.tsbuildinfo
 .env
 
-# The local SQLite database is rebuilt by seed.py, so it is never committed.
+# The local database file is rebuilt by seed.py, so it is never committed.
 ghostnet.db
 *.db
