@@ -6,6 +6,7 @@ input, calls one algorithm module, and returns JSON. No logic lives here.
 Run it with:  uvicorn main:app --reload
 """
 
+import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -30,10 +31,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="GhostNet API", version="1.0", lifespan=lifespan)
 
-# The frontend runs on its own port during development, so it needs to be let in.
+# A browser blocks a page on one address from calling an API on another unless
+# the API says that address is allowed. Locally that is port 3000. Once the
+# frontend is deployed its address is added through ALLOWED_ORIGINS, which is a
+# comma separated list, so the deployed URL never has to be hardcoded here.
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
+    # Vercel gives every deployment its own address, so the preview URLs are
+    # matched by pattern rather than listed one by one.
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
