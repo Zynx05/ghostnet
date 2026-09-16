@@ -180,7 +180,9 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
                 Every entry judged on the work alone. Click a column to sort.
               </div>
             </div>
-            {!closed && !reveal && (
+            {/* Stays available after the announcement too, so anyone arriving
+                later can still see who won. */}
+            {!reveal && (
               <button className="btn btn-accent" onClick={runReveal}>Reveal the winner</button>
             )}
           </div>
