@@ -24,35 +24,21 @@ address is written into the code.
 
 ## Running it
 
-You need Python 3.10 or newer, Node 20 or newer, and PostgreSQL.
+You need Python 3.10 or newer and Node 20 or newer. No database to install.
 
-### 1. PostgreSQL
-
-Install it once from https://www.postgresql.org/download/windows/ and let the
-installer put it on port 5432. Remember the password you give the postgres
-user. Then, from the `backend` folder:
-
-```bash
-pip install -r requirements.txt
-python setup_db.py --password YOUR_POSTGRES_PASSWORD
-python seed.py
-```
-
-`setup_db.py` creates the ghostnet role, the ghostnet database and the three
-tables. `seed.py` loads the demo data. Both are safe to run again.
-
-If somebody on the team would rather not install anything, create a free
-database at https://neon.tech, copy the connection string into
-`backend/.env`, and skip `setup_db.py`. See `backend/.env.example`.
-
-### 2. Backend, in its own terminal
+### Backend, in its own terminal
 
 ```bash
 cd backend
+pip install -r requirements.txt
+python seed.py
 uvicorn main:app --reload
 ```
 
-### 3. Frontend, in a second terminal
+`seed.py` creates `backend/ghostnet.db` and fills it with the demo data.
+Delete that file and run it again whenever you want a clean start.
+
+### Frontend, in a second terminal
 
 ```bash
 cd frontend
@@ -64,12 +50,29 @@ npm run dev
 | --- | --- |
 | App | http://localhost:3000 |
 | API documentation | http://localhost:8000/docs |
-| Database | postgresql://ghostnet:ghostnet@localhost:5432/ghostnet |
+
+### Which database you get
+
+The backend reads `DATABASE_URL`. If it is not set, it uses SQLite in a single
+file, which is why nothing has to be installed.
+
+| `DATABASE_URL` | What runs |
+| --- | --- |
+| not set | SQLite at `backend/ghostnet.db` |
+| `postgresql://...` | PostgreSQL |
+
+Railway sets it to a PostgreSQL address, so the deployed site runs on
+PostgreSQL while laptops run on SQLite. The `api` job in CI runs against a real
+PostgreSQL container on every push, which is what stops the two drifting apart.
+
+To test against PostgreSQL on your own machine, install it, run
+`python setup_db.py`, and put the address in `backend/.env`. See
+`backend/.env.example`.
 
 ## Checking the work
 
-From the `backend` folder. Neither of these needs the database running, because
-the algorithms do not know the database exists.
+From the `backend` folder. Neither of these needs a database at all, because
+the algorithms do not know a database exists.
 
 ```bash
 python -m pytest tests -v     # one test per algorithm
@@ -96,7 +99,7 @@ python benchmark.py           # measured time next to the claimed big O
 ghostnet/
   backend/
     main.py            the API, thin on purpose
-    db.py              three tables in PostgreSQL, reached through a pool
+    db.py              three tables. SQLite locally, PostgreSQL deployed
     seed.py            demo data, including one deliberate copy
     benchmark.py       measured growth for the report
     algorithms/        nine algorithms, written by hand

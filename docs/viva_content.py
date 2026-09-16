@@ -35,7 +35,7 @@ SHARED = {
     ),
     "stack": [
         ["Backend", "Python 3.12, FastAPI, Uvicorn, Pydantic"],
-        ["Database", "PostgreSQL 16, psycopg 3, a small connection pool"],
+        ["Database", "SQLite on a laptop, PostgreSQL 16 when deployed, one set of SQL"],
         ["Frontend", "Next.js 15, React 19, TypeScript, plain CSS"],
         ["Testing", "pytest, 12 tests, and none of them needs the database"],
         ["Automation", "GitHub Actions, three jobs, runs on every push"],
@@ -275,6 +275,7 @@ MEMBERS = [
         ),
         "built": [
             "The three tables. challenges, submissions and results, with real types, foreign keys, and cascade delete.",
+            "One db.py that speaks to both SQLite and PostgreSQL. The rest of the project writes one style of SQL and this file translates.",
             "Two indexes. PostgreSQL does not index a foreign key by itself, and we filter on both of ours all the time.",
             "A unique rule on challenge id and ghost id in results. Running the ranking twice now updates the scores instead of adding a second copy.",
             "The connection pool, and the two helpers query and execute that the whole API uses.",
@@ -285,9 +286,10 @@ MEMBERS = [
             ["backend/algorithms/rabin_karp.py", "the search and the overlap score"],
         ],
         "tools": (
-            "PostgreSQL 16, for real types and real rules. psycopg 3 as the "
-            "driver, with a connection pool. Rows come back as dictionaries, "
-            "which is what keeps the API file short."
+            "SQLite on a laptop, so nobody has to install anything to run the "
+            "project. PostgreSQL 16 on the deployed site, for real types and "
+            "real rules, reached with psycopg 3 and a connection pool. Rows "
+            "come back as dictionaries either way, which keeps the API short."
         ),
         "steps": [
             "Treat a run of letters as one big number in base 256, kept small using modulo a large prime.",
@@ -321,7 +323,9 @@ MEMBERS = [
             ("Why those two indexes?",
              "PostgreSQL indexes a primary key by itself but not a foreign key. We filter on both foreign keys in nearly every query. Without the indexes, every read has to scan the whole table."),
             ("What does the connection pool save?",
-             "Opening a connection and logging in takes longer than most of our queries. The pool keeps a few open and lends them out, so we pay that cost once at startup instead of on every request."),
+             "Opening a connection and logging in takes longer than most of our queries. The pool keeps a few open and lends them out, so we pay that cost once at startup instead of on every request. SQLite needs no pool, because it is a file and not a server."),
+            ("Two databases sounds risky. Why do it?",
+             "It is risky, and we know the risk: something can work on a laptop and break when deployed. We handle it two ways. All the differences live in one file, db.py, so there is one place to look. And CI runs the whole API against a real PostgreSQL container on every push, so the two cannot quietly drift apart."),
         ],
         "show": (
             "The Copied column. Ghost 003 is at 87 percent and comes last, even "

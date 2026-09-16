@@ -45,7 +45,7 @@ Status: in progress
 
 | Decision | Why |
 | --- | --- |
-| PostgreSQL, not SQLite | The schema uses real types and real constraints, and the same database runs locally, in a container and in CI. SQLite would have been one less thing to install, and that was the trade we made |
+| SQLite on a laptop, PostgreSQL deployed | Nobody has to install a database to run the project, and the deployed site still gets real types and real constraints. The cost is that two paths exist. CI runs the API against real PostgreSQL on every push so they cannot drift apart |
 | No Docker | One more tool to install, and the team is on Windows laptops where it is heavy. A setup script against a normal PostgreSQL install does the same job in a way everyone can read |
 | No login | Authentication proves nothing about ranking, which is what is graded |
 | No real blockchain | A Merkle tree and a hash chain show the same property without a network |
