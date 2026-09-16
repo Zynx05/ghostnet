@@ -382,6 +382,17 @@ table.data th.sortable:hover { color: var(--blue); }
 .legend-run { background: var(--good); }
 .legend-clash { background: #c9c9c4; }
 
+.legend-notes {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.legend-notes strong { color: var(--text); }
+
 .sched-row { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .sched-row:last-child { border-bottom: none; }
 

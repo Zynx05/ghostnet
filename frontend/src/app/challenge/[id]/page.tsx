@@ -7,12 +7,12 @@ import { mergeSort, type Direction } from '../../../lib/mergeSort';
 import type { Challenge, Submission, RankedRow, RevealResponse } from '../../../lib/types';
 import { Badge, EmptyState, Flash, type FlashMessage } from '../../../components/ui';
 
-const COLUMNS: { key: keyof RankedRow; label: string }[] = [
-  { key: 'relevance', label: 'Relevance' },
-  { key: 'quality', label: 'Quality' },
-  { key: 'structure', label: 'Structure' },
-  { key: 'plagiarism', label: 'Copied' },
-  { key: 'final_score', label: 'Score' },
+const COLUMNS: { key: keyof RankedRow; label: string; help: string }[] = [
+  { key: 'relevance', label: 'Relevance', help: 'Does it answer what was asked' },
+  { key: 'quality', label: 'Quality', help: 'How closely it matches the brief' },
+  { key: 'structure', label: 'Structure', help: 'Does it contain real working logic' },
+  { key: 'plagiarism', label: 'Copied', help: 'How much also appears in another entry' },
+  { key: 'final_score', label: 'Score', help: 'The four above, combined' },
 ];
 
 export default function ChallengePage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,10 +33,16 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
   const [content, setContent] = useState('');
   const [name, setName] = useState('');
 
+  const closed = challenge?.revealed ?? false;
+
   async function load() {
     try {
-      setChallenge(await api.challenge(challengeId));
+      const c = await api.challenge(challengeId);
+      setChallenge(c);
       setSubs(await api.submissions(challengeId));
+      // A finished challenge shows its result straight away, so nobody has to
+      // press Rank to see something that has already been decided.
+      if (c.revealed) setRows(await api.results(challengeId));
     } catch (e) {
       setFlash({ text: (e as Error).message, err: true });
     }
@@ -112,22 +118,29 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
             <h1 className="page-title">{challenge.title}</h1>
             <div className="card-meta">{challenge.company} · closes day {challenge.end_day}</div>
           </div>
-          {challenge.reward && <Badge tone="accent">{challenge.reward}</Badge>}
+          <div className="cluster">
+            {challenge.reward && <Badge tone="accent">{challenge.reward}</Badge>}
+            {closed && <Badge tone="good">Winner announced</Badge>}
+          </div>
         </div>
         <p className="card-body">{challenge.statement}</p>
-        <div className="actions">
-          <button className="btn" onClick={() => setShowSubmit(!showSubmit)}>
-            {showSubmit ? 'Cancel' : 'Submit your work'}
-          </button>
-          <button className="btn btn-accent" onClick={runRank} disabled={busy || subs.length === 0}>
-            {busy ? 'Ranking…' : 'Rank submissions'}
-          </button>
-        </div>
+
+        {/* A closed challenge takes no more entries, so it offers no buttons. */}
+        {!closed && (
+          <div className="actions">
+            <button className="btn" onClick={() => setShowSubmit(!showSubmit)}>
+              {showSubmit ? 'Cancel' : 'Submit your work'}
+            </button>
+            <button className="btn btn-accent" onClick={runRank} disabled={busy || subs.length === 0}>
+              {busy ? 'Ranking…' : 'Rank submissions'}
+            </button>
+          </div>
+        )}
       </section>
 
       <Flash message={flash} />
 
-      {showSubmit && (
+      {showSubmit && !closed && (
         <section className="card">
           <div className="card-title">Your submission</div>
           <div className="card-meta">No name, no CV, no photo. Only the work is judged.</div>
@@ -140,10 +153,20 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
           <div className="field">
             <label className="field-label">Your name</label>
             <input className="field-input" value={name} onChange={e => setName(e.target.value)} />
-            <div className="field-hint">Kept private until you win.</div>
+            <div className="field-hint">Kept private unless you win.</div>
           </div>
           <div className="actions">
             <button className="btn btn-accent" onClick={submit}>Submit</button>
+          </div>
+        </section>
+      )}
+
+      {reveal && (
+        <section className="winner">
+          <span className="algo-tag">Winner</span>
+          <div className="winner-name">{reveal.real_name}</div>
+          <div className="winner-score">
+            Entered as {reveal.winner.ghost_id} · score {reveal.winner.final_score.toFixed(2)}
           </div>
         </section>
       )}
@@ -152,10 +175,12 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
         <section className="card">
           <div className="row-between">
             <div>
-              <div className="card-title">Ranking</div>
-              <div className="card-meta">Judged on the work alone. Click a column to sort.</div>
+              <div className="card-title">Results</div>
+              <div className="card-meta">
+                Every entry judged on the work alone. Click a column to sort.
+              </div>
             </div>
-            {!reveal && (
+            {!closed && !reveal && (
               <button className="btn btn-accent" onClick={runReveal}>Reveal the winner</button>
             )}
           </div>
@@ -165,9 +190,10 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
               <thead>
                 <tr>
                   <th className="num">#</th>
-                  <th>Submission</th>
+                  <th>Entry</th>
                   {COLUMNS.map(c => (
-                    <th key={c.key} className="num sortable" onClick={() => sortBy(c.key)}>
+                    <th key={c.key} className="num sortable" title={c.help}
+                      onClick={() => sortBy(c.key)}>
                       {c.label}
                     </th>
                   ))}
@@ -190,24 +216,17 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
               </tbody>
             </table>
           </div>
-        </section>
-      )}
 
-      {reveal && (
-        <section className="winner">
-          <span className="algo-tag">Winner</span>
-          <div className="winner-name">{reveal.real_name}</div>
-          <div className="winner-score">
-            Submitted as {reveal.winner.ghost_id} · score {reveal.winner.final_score.toFixed(2)}
-          </div>
-          <div className="hash" style={{ color: 'rgba(255,255,255,0.7)', marginTop: 10 }}>
-            Proof of win: {reveal.merkle_root}
+          <div className="legend-notes">
+            {COLUMNS.slice(0, 4).map(c => (
+              <div key={c.key}><strong>{c.label}</strong> {c.help}</div>
+            ))}
           </div>
         </section>
       )}
 
       <section className="card">
-        <div className="card-title">Submissions ({subs.length})</div>
+        <div className="card-title">Entries ({subs.length})</div>
         {subs.length === 0 ? (
           <EmptyState title="Nothing submitted yet" description="Be the first." />
         ) : (

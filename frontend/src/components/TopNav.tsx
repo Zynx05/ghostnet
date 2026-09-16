@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+// Two tabs only. /matching and /schedule still exist and still work, they are
+// just not part of the product a normal user needs to see.
 const LINKS = [
   { href: '/', label: 'Challenges' },
-  { href: '/matching', label: 'Matches' },
-  { href: '/schedule', label: 'Calendar' },
-  { href: '/chain', label: 'Verified wins' },
+  { href: '/chain', label: 'Skill Proof' },
 ];
 
 export function TopNav() {

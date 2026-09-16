@@ -4,7 +4,7 @@
  */
 
 import type {
-  Challenge, Submission, RankResponse, RevealResponse,
+  Challenge, Submission, RankResponse, RankedRow, RevealResponse,
   ChainBlock, ScheduleResponse, MatchResponse,
 } from './types';
 
@@ -40,6 +40,9 @@ export const api = {
     }),
 
   rank: (id: number) => call<RankResponse>(`/challenges/${id}/rank`, { method: 'POST' }),
+
+  /** The scores from the last ranking run, without scoring again. */
+  results: (id: number) => call<RankedRow[]>(`/challenges/${id}/results`),
 
   reveal: (id: number) => call<RevealResponse>(`/challenges/${id}/reveal`, { method: 'POST' }),
 
