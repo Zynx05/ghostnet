@@ -1,0 +1,150 @@
+/* ghostnet.css
+   The few pieces the copied design system does not already cover.
+   Everything here uses the tokens from globals.css, so nothing hardcodes a
+   colour and the whole app restyles from one place. */
+
+.sidebar-brand-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.nav-link-note {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.nav-link[aria-current="page"] .nav-link-note { color: var(--accent-ink); opacity: 0.7; }
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 0.9rem;
+  border-top: 2px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--text-faint);
+}
+
+/* A label above a value, used for the algorithm name over a score. */
+.algo-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  display: block;
+}
+
+/* Marks which member owns the thing on screen. Handy during the viva. */
+.owner {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 2px solid var(--border);
+  padding: 2px 6px;
+  background: var(--bg-2);
+  white-space: nowrap;
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.stack { display: flex; flex-direction: column; gap: 1.25rem; }
+.cluster { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+
+.code-block {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-2);
+  border: 2px solid var(--border);
+  padding: 0.75rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.hash {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--text-muted);
+}
+
+/* The winner card after the reveal. Inverted, because it is the one moment
+   in the flow where anonymity ends. */
+.winner {
+  border: 2px solid var(--border);
+  background: var(--text);
+  color: var(--bg);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.winner .algo-tag { color: var(--bg); opacity: 0.7; }
+.winner-name { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+
+/* The timeline used by the greedy scheduling page. */
+.timeline-bar {
+  position: relative;
+  height: 26px;
+  background: var(--bg-2);
+  border: 2px solid var(--border);
+  margin-bottom: 0.4rem;
+}
+
+.timeline-span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.timeline-span-chosen { background: var(--good); color: #fff; }
+.timeline-span-dropped { background: var(--bg-3); color: var(--text-muted); }
+
+.bar-track {
+  height: 8px;
+  background: var(--bg-3);
+  border: 2px solid var(--border);
+  min-width: 60px;
+}
+
+.bar-fill { height: 100%; background: var(--text); }
+.bar-fill-bad { background: var(--bad); }
+
+.log-list {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.8;
+  list-style: none;
+  counter-reset: step;
+}
+
+.log-list li::before {
+  counter-increment: step;
+  content: counter(step) ". ";
+  color: var(--text-faint);
+}

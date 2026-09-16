@@ -1,0 +1,317 @@
+/* globals.css
+   Brutalist monochrome light theme.
+   Structure is carried by 2px black borders and hard offset shadows rather
+   than by soft elevation, so nothing depends on colour to read as a boundary.
+   Colour appears only where it encodes data. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #ffffff;   /* page */
+  --bg-2:       #f4f4f0;   /* sidebar, table headers, inset wells */
+  --bg-3:       #e8e8e4;   /* tracks, disabled */
+  --surface:    #ffffff;   /* cards — charts are validated against THIS */
+  --surface-2:  #f4f4f0;
+
+  --text:       #0a0a0a;
+  --text-muted: #404040;
+  --text-faint: #737373;
+
+  --border:     #0a0a0a;   /* always black; brutalism has no soft borders */
+  --border-soft:#d4d4d0;   /* hairlines inside a card only */
+
+  --accent:     #0a0a0a;   /* the "accent" is ink; emphasis is inversion */
+  --accent-ink: #ffffff;   /* text on an inverted surface */
+
+  --good:       #059669;
+  --warn:       #d97706;
+  --bad:        #dc2626;
+
+  --shadow:     4px 4px 0px 0px #0a0a0a;
+  --shadow-sm:  2px 2px 0px 0px #0a0a0a;
+  --shadow-lg:  8px 8px 0px 0px #0a0a0a;
+
+  --font:       'Host Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono:  'Space Mono', ui-monospace, 'Cascadia Mono', monospace;
+
+  --radius: 0;              /* kept as a token so nothing hardcodes a curve */
+  --radius-sm: 0;
+
+  --sidebar-w: 244px;
+  --header-h: 68px;
+
+  /* ── Chart series ──────────────────────────────────
+     Light-mode steps, validated against --surface (#ffffff): lightness band,
+     chroma floor, adjacent CVD deltaE 9.1, normal-vision floor 19.6 all pass.
+     Contrast WARNs on aqua/yellow/magenta (below 3:1), which obliges relief —
+     satisfied here because every mark carries a 2px black border and every bar
+     is directly labelled. Assign in fixed order; never cycle. */
+  --series-1: #2a78d6;  /* blue    */
+  --series-2: #eb6834;  /* orange  */
+  --series-3: #1baf7a;  /* aqua    */
+  --series-4: #eda100;  /* yellow  */
+  --series-5: #e87ba4;  /* magenta */
+  --series-6: #008300;  /* green   */
+  --series-7: #4a3aa7;  /* violet  */
+  --series-8: #e34948;  /* red     */
+
+  --grid: #d4d4d0;
+  --axis: #0a0a0a;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font);
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+a { color: var(--text); text-decoration: none; }
+
+button, input, select, textarea { font-family: inherit; }
+button { cursor: pointer; font-family: var(--font-mono); text-transform: uppercase; }
+
+::selection { background: var(--text); color: var(--bg); }
+
+/* Scrollbar — square, high contrast, consistent with the borders. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-2); border-left: 2px solid var(--border); }
+::-webkit-scrollbar-thumb { background: var(--text); border: 2px solid var(--bg-2); }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Page ─────────────────────────────────────────── */
+.page { max-width: 1320px; margin: 0 auto; padding: 1.75rem 2rem 3rem; }
+
+.page-title { font-size: 1.6rem; margin-bottom: 0.35rem; }
+.page-subtitle {
+  font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;
+  font-family: var(--font-mono);
+}
+.section-heading {
+  font-size: 0.85rem; letter-spacing: 0.02em;
+  margin: 1.75rem 0 0.75rem;
+}
+
+/* An inverted highlight instead of a gradient — the reference's signature. */
+.mark-hl {
+  background: var(--text); color: var(--bg);
+  padding: 0 0.4rem; display: inline-block; transform: skew(-5deg);
+}
+
+/* ── Buttons ──────────────────────────────────────── */
+.btn {
+  background: var(--bg); color: var(--text);
+  border: 2px solid var(--border); border-radius: 0;
+  padding: 0.55rem 1.1rem; font-size: 12px; font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.1s, color 0.1s;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 0 var(--border); }
+.btn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--border); }
+.btn-accent { background: var(--text); color: var(--bg); }
+.btn-accent:hover { background: var(--text-muted); }
+.btn-sm { padding: 0.35rem 0.7rem; font-size: 11px; }
+.btn-ghost { box-shadow: none; border-color: transparent; }
+.btn-ghost:hover { border-color: var(--border); box-shadow: var(--shadow-sm); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ── Badge ────────────────────────────────────────── */
+.badge {
+  display: inline-block; border: 2px solid var(--border);
+  padding: 1px 7px; font-size: 10px; font-weight: 700;
+  font-family: var(--font-mono); text-transform: uppercase;
+  letter-spacing: 0.03em; background: var(--bg); white-space: nowrap;
+}
+
+/* ── Search / inputs ──────────────────────────────── */
+.search-row { display: flex; gap: 0.6rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.search-input, .filter-select {
+  background: var(--bg); border: 2px solid var(--border); border-radius: 0;
+  color: var(--text); padding: 0.5rem 0.75rem; font-size: 13px;
+  font-family: var(--font-mono);
+}
+.search-input { flex: 1; min-width: 220px; }
+.search-input:focus, .filter-select:focus { outline: none; box-shadow: var(--shadow-sm); }
+
+/* ── Lists (contacts) ─────────────────────────────── */
+.contact-list { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+.contact-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  border: 2px solid var(--border); background: var(--bg);
+  padding: 0.7rem 0.9rem; box-shadow: var(--shadow-sm);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.contact-item:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 0 var(--border); }
+.contact-name { font-weight: 700; }
+.contact-meta { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+
+/* The badges belong in a column, not trailing whatever the name happens to be.
+   Without this the name block sizes to its text, so every row starts its
+   badges at a different x and the list reads as ragged rather than as a
+   table. The name takes the slack; min-width:0 lets a long one ellipsis
+   instead of shoving the badges off the row. */
+.contact-item > :first-child { flex: 1 1 auto; min-width: 0; }
+.contact-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.contact-meta {
+  display: flex; align-items: center; gap: 0.4rem;
+  margin-left: auto; flex-shrink: 0;
+}
+
+/* ── Card ─────────────────────────────────────────── */
+.card {
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: 0; padding: 1.1rem; box-shadow: var(--shadow);
+}
+.card-title { font-weight: 700; }
+.card-meta { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+
+.status-line { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+.divider { border: none; border-top: 2px solid var(--border); margin: 1.25rem 0; }
+.empty { color: var(--text-muted); font-size: 13px; padding: 1rem 0; font-family: var(--font-mono); }
+
+/* ── Flash ────────────────────────────────────────── */
+.flash {
+  border: 2px solid var(--border); background: var(--bg-2);
+  padding: 0.6rem 0.9rem; font-size: 13px; margin-bottom: 1rem;
+  box-shadow: var(--shadow-sm); font-family: var(--font-mono);
+}
+.flash-err { border-color: var(--bad); color: var(--bad); box-shadow: 2px 2px 0 0 var(--bad); }
+
+/* ── Timeline ─────────────────────────────────────── */
+.timeline { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+.timeline-item {
+  display: flex; gap: 0.7rem; align-items: flex-start;
+  border-left: 2px solid var(--border); padding: 0.35rem 0 0.35rem 0.8rem;
+}
+.timeline-date { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); }
+
+/* ── Note form ────────────────────────────────────── */
+.note-form { display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
+.note-input {
+  width: 100%; min-height: 84px; resize: vertical;
+  background: var(--bg); border: 2px solid var(--border); border-radius: 0;
+  color: var(--text); padding: 0.6rem 0.75rem; font-size: 13px; line-height: 1.5;
+  font-family: var(--font);
+}
+.note-input:focus { outline: none; box-shadow: var(--shadow-sm); }
+
+/* ── Contact points ───────────────────────────────── */
+.cp-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+.cp-item {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  border: 2px solid var(--border); padding: 0.5rem 0.7rem; background: var(--bg);
+}
+.cp-value { font-family: var(--font-mono); font-size: 13px; }
+
+/* ── Candidate cards (duplicates) ─────────────────── */
+.candidate-card {
+  border: 2px solid var(--border); background: var(--surface);
+  padding: 0.9rem; box-shadow: var(--shadow); margin-bottom: 0.8rem;
+}
+.candidate-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+
+/* ── Home nav cards ───────────────────────────────── */
+.home-nav { display: flex; flex-direction: column; gap: 0.6rem; }
+.home-nav-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  border: 2px solid var(--border); background: var(--bg);
+  padding: 0.85rem 1rem; box-shadow: var(--shadow-sm);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.home-nav-item:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 0 var(--border); }
+.home-nav-label { font-weight: 800; text-transform: uppercase; letter-spacing: -0.02em; }
+.home-nav-desc { font-size: 12px; color: var(--text-muted); display: block; font-family: var(--font-mono); }
+.home-nav-arrow { font-size: 18px; }
+
+.back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 1rem;
+}
+.back-link:hover { color: var(--text); }
+
+/* ── Sign in ────────────────────────────────────────────────────────────────
+   A single centred card on the page ground. No sidebar, no top bar: there is
+   nothing to navigate to until you are through it. */
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: var(--bg);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  border: 2px solid var(--border);
+  box-shadow: var(--shadow);
+  background: var(--surface, #fff);
+  padding: 1.75rem;
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.login-wordmark {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 1.05rem;
+}
+
+.login-product {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+.login-foot {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--border);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+/* ── Signed-in identity in the header ──────────────────────────────────── */
+.actor-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.actor-name { font-weight: 700; }
+
+.actor-role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  border: 2px solid var(--border);
+  padding: 1px 5px;
+}

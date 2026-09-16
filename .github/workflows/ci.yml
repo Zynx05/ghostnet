@@ -1,0 +1,93 @@
+# DevOps owns this file.
+# Every push runs the algorithm tests and builds the frontend, so a broken
+# algorithm is caught before the demo and not during it.
+
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  algorithms:
+    # The algorithms do not know the database exists, so this job needs no
+    # database at all and finishes in seconds.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r ghostnet/backend/requirements.txt
+      - run: python -m pytest tests -v
+        working-directory: ghostnet/backend
+      - run: python benchmark.py
+        working-directory: ghostnet/backend
+
+  api:
+    # This one does need a database, so GitHub starts a PostgreSQL container
+    # beside the job and waits for it to answer before the steps run.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ghostnet
+          POSTGRES_PASSWORD: ghostnet
+          POSTGRES_DB: ghostnet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ghostnet -d ghostnet"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ghostnet:ghostnet@localhost:5432/ghostnet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r ghostnet/backend/requirements.txt
+      - name: Load the demo data
+        run: python seed.py
+        working-directory: ghostnet/backend
+      - name: Rank, reveal and read the chain
+        working-directory: ghostnet/backend
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          import main
+
+          with TestClient(main.app) as client:
+              assert client.get("/health").json()["status"] == "ok"
+
+              results = client.post("/challenges/1/rank").json()["results"]
+              assert len(results) == 4
+
+              # The seeded copy must come last. If a change to any scoring
+              # algorithm lets copied work climb, this line fails the build.
+              worst = results[-1]
+              assert worst["plagiarism"] > 0.5, worst
+
+              reveal = client.post("/challenges/1/reveal").json()
+              assert reveal["real_name"] == "Bilal Ahmed", reveal["real_name"]
+
+              assert len(client.get("/chain").json()["blocks"]) == 1
+          print("api checks passed")
+          PY
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install
+        working-directory: ghostnet/frontend
+      - run: npx tsc --noEmit
+        working-directory: ghostnet/frontend
+      - run: npm run build
+        working-directory: ghostnet/frontend
