@@ -18,11 +18,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r ghostnet/backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
       - run: python -m pytest tests -v
-        working-directory: ghostnet/backend
+        working-directory: backend
       - run: python benchmark.py
-        working-directory: ghostnet/backend
+        working-directory: backend
 
   api:
     # This one does need a database, so GitHub starts a PostgreSQL container
@@ -49,12 +49,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r ghostnet/backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
       - name: Load the demo data
         run: python seed.py
-        working-directory: ghostnet/backend
+        working-directory: backend
       - name: Rank, reveal and read the chain
-        working-directory: ghostnet/backend
+        working-directory: backend
         run: |
           python - <<'PY'
           from fastapi.testclient import TestClient
@@ -86,8 +86,8 @@ jobs:
         with:
           node-version: "22"
       - run: npm install
-        working-directory: ghostnet/frontend
+        working-directory: frontend
       - run: npx tsc --noEmit
-        working-directory: ghostnet/frontend
+        working-directory: frontend
       - run: npm run build
-        working-directory: ghostnet/frontend
+        working-directory: frontend
