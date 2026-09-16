@@ -8,6 +8,20 @@ reveals who wrote the winning one.
 
 Design and Analysis of Algorithms project. University of Karachi, UBIT.
 
+## Live
+
+| What | Where |
+| --- | --- |
+| App | https://web-production-4bf9e.up.railway.app |
+| API | https://api-production-cdf9.up.railway.app |
+| API documentation | https://api-production-cdf9.up.railway.app/docs |
+| Code | https://github.com/Zynx05/ghostnet |
+
+All three services run in one Railway project: `web`, `api` and `Postgres`.
+The frontend reads the API address from `NEXT_PUBLIC_API` at build time, and
+the API reads the allowed browser origins from `ALLOWED_ORIGINS`, so neither
+address is written into the code.
+
 ## Running it
 
 You need Python 3.10 or newer, Node 20 or newer, and PostgreSQL.
