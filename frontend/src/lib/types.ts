@@ -59,6 +59,10 @@ export interface ChainBlock {
   record: string;
   previous_hash: string;
   hash: string;
+  ghost_id: string;
+  title: string;
+  company: string;
+  score: number;
 }
 
 export interface Window {

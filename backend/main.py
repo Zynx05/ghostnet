@@ -191,7 +191,12 @@ def reveal(challenge_id: int):
 
 @app.get("/chain")
 def proof_chain():
-    """Every revealed win so far, linked block by block."""
+    """
+    Every revealed win so far, linked block by block.
+
+    The details of each win are returned beside the hashes so the credential
+    page can show what was won, not only that something was.
+    """
     wins = db.query(
         "SELECT c.title, c.company, r.ghost_id, r.final_score"
         " FROM results r JOIN challenges c ON c.id = r.challenge_id"
@@ -201,7 +206,24 @@ def proof_chain():
         w["ghost_id"] + " won " + w["title"] + " at " + w["company"]
         for w in wins
     ]
-    return {"blocks": merkle.chain(records), "merkle_root": merkle.root(records)}
+
+    blocks = []
+    for block, win in zip(merkle.chain(records), wins):
+        blocks.append({
+            **block,
+            "ghost_id": win["ghost_id"],
+            "title": win["title"],
+            "company": win["company"],
+            "score": win["final_score"],
+        })
+
+    return {
+        "blocks": blocks,
+        "merkle_root": merkle.root(records),
+        # One line per ghost id, so the page can show a credential per person
+        # rather than one flat list of everybody's wins.
+        "holders": sorted({w["ghost_id"] for w in wins}),
+    }
 
 
 @app.post("/match")

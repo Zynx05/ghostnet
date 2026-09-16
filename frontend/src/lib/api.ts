@@ -43,7 +43,7 @@ export const api = {
 
   reveal: (id: number) => call<RevealResponse>(`/challenges/${id}/reveal`, { method: 'POST' }),
 
-  chain: () => call<{ blocks: ChainBlock[]; merkle_root: string }>('/chain'),
+  chain: () => call<{ blocks: ChainBlock[]; merkle_root: string; holders: string[] }>('/chain'),
 
   schedule: () => call<ScheduleResponse>('/schedule'),
 

@@ -303,22 +303,6 @@ table.data th.sortable:hover { color: var(--blue); }
 .winner-name { font-size: 24px; font-weight: 700; margin-top: 2px; }
 .winner-score { font-size: 13px; opacity: 0.85; margin-top: 4px; }
 
-/* ── Schedule timeline ───────────────────────────────────────────────── */
-
-.timeline-bar { position: relative; height: 26px; background: #ededea; border-radius: 6px; margin-top: 4px; }
-
-.timeline-span {
-  position: absolute; top: 0; bottom: 0;
-  border-radius: 6px;
-  display: flex; align-items: center;
-  padding: 0 8px;
-  font-size: 11px; font-weight: 600;
-  white-space: nowrap; overflow: hidden;
-}
-
-.timeline-span-chosen { background: var(--good); color: #fff; }
-.timeline-span-dropped { background: #cfcfcb; color: var(--muted); }
-
 /* ── Proposal log ────────────────────────────────────────────────────── */
 
 .log-list { list-style: none; counter-reset: step; font-size: 13px; line-height: 1.9; margin-top: 8px; }
@@ -326,6 +310,124 @@ table.data th.sortable:hover { color: var(--blue); }
 
 .pref { margin-top: 8px; }
 .pref-order { font-family: var(--mono); font-size: 12px; }
+
+.steps { margin: 10px 0 0 18px; font-size: 13px; line-height: 1.9; }
+
+/* ── Offer round ─────────────────────────────────────────────────────── */
+
+.pick {
+  flex: 1;
+  min-width: 150px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.pick-clash { border-color: var(--bad); background: var(--bad-soft); }
+.pick-name { font-family: var(--mono); font-size: 13px; font-weight: 600; margin-top: 2px; }
+.pick-clash .pick-name { color: var(--bad); }
+
+/* ── Calendar ────────────────────────────────────────────────────────── */
+
+.cal {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.cal-head {
+  background: #faf9f7;
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cal-cell {
+  background: var(--surface);
+  min-height: 74px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cal-date { font-size: 11px; color: var(--faint); padding-left: 2px; }
+
+.cal-today { background: var(--blue-soft); }
+.cal-today .cal-date { color: var(--blue); font-weight: 700; }
+
+.cal-chip {
+  font-size: 10px;
+  line-height: 1.3;
+  padding: 3px 5px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-chip-run { background: var(--good-soft); color: var(--good); border-left: 3px solid var(--good); }
+.cal-chip-clash { background: #efefec; color: var(--faint); border-left: 3px solid #c9c9c4; text-decoration: line-through; }
+
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.legend-run { background: var(--good); }
+.legend-clash { background: #c9c9c4; }
+
+.sched-row { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.sched-row:last-child { border-bottom: none; }
+
+/* ── Skill Proof credential ──────────────────────────────────────────── */
+
+.credential {
+  background: linear-gradient(135deg, #0a66c2, #004182);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.credential-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.credential .algo-tag { color: rgba(255,255,255,0.7); }
+.credential-id { font-family: var(--mono); font-size: 22px; font-weight: 700; margin-top: 2px; }
+.credential-count { text-align: right; }
+.credential-count-n { font-size: 32px; font-weight: 700; line-height: 1; }
+
+.credential-foot {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.25);
+}
+
+.credential-foot .hash { color: rgba(255,255,255,0.85); }
+
+/* ── The chain of wins ───────────────────────────────────────────────── */
+
+.chain { margin-top: 14px; }
+.chain-item { display: flex; gap: 12px; }
+.chain-rail { display: flex; flex-direction: column; align-items: center; }
+
+.chain-dot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--good);
+  color: #fff;
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.chain-line { width: 2px; flex: 1; background: var(--line); margin: 2px 0; }
+.chain-body { padding-bottom: 18px; flex: 1; min-width: 0; }
+.chain-title { font-weight: 600; }
+.chain-seal { margin-top: 6px; }
 
 @media (max-width: 600px) {
   .topnav-inner { gap: 12px; }
