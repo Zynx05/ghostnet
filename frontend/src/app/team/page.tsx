@@ -34,7 +34,7 @@ const TEAM: Member[] = [
     tone: 'ink',
   },
   {
-    name: 'Nameera',
+    name: 'Nameerah',
     role: 'Blockchain Developer',
     blurb: 'Cryptographic Skill Proof Chain, anonymous verified credentials.',
     tone: 'paper',

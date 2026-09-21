@@ -820,12 +820,16 @@ table.data tr.row-me td { background: var(--yellow); }
 
 .team-card:hover { transform: translate(-3px, -3px); box-shadow: 7px 7px 0 var(--ink); }
 
+/* Both of these set their own white background, so they have to set their own
+   ink colour too. Without it they inherit the card colour and a blue card
+   ends up with white text on a white box. */
 .team-num {
   position: absolute; top: 0; right: 0;
   font-family: var(--mono); font-size: 12px; font-weight: 700;
   padding: 3px 8px;
   border-left: var(--border); border-bottom: var(--border);
   background: var(--white);
+  color: var(--ink);
 }
 
 .team-initials {
@@ -834,6 +838,7 @@ table.data tr.row-me td { background: var(--yellow); }
   display: flex; align-items: center; justify-content: center;
   font-size: 19px; font-weight: 700; letter-spacing: -0.02em;
   background: var(--white);
+  color: var(--ink);
   margin-bottom: 14px;
 }
 
@@ -844,6 +849,7 @@ table.data tr.row-me td { background: var(--yellow); }
   padding: 2px 8px;
   border: 2px solid var(--ink);
   background: var(--white);
+  color: var(--ink);
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
 }
 
