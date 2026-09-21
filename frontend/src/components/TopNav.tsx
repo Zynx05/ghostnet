@@ -61,12 +61,7 @@ export function TopNav() {
           })}
         </nav>
 
-        {session === undefined ? null : session === null ? (
-          <div className="topnav-right">
-            <Link href="/login" className="btn btn-sm btn-ghost">Log in</Link>
-            <Link href="/signup" className="btn btn-sm btn-accent">Sign up</Link>
-          </div>
-        ) : session.role === 'company' ? (
+        {!session ? null : session.role === 'company' ? (
           <div className="topnav-right">
             <span className="chip" title="Balance">Rs {session.balance_pkr.toLocaleString()}</span>
             <Link href="/post" className="btn btn-sm btn-accent">Post a challenge</Link>

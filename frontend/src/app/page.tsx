@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '../lib/api';
+import { useSession } from '../lib/auth';
 import type { Challenge } from '../lib/types';
 import { Badge, EmptyState, Flash, Skeleton, type FlashMessage } from '../components/ui';
 
 export default function ChallengesPage() {
+  const session = useSession();
   const [rows, setRows] = useState<Challenge[] | null>(null);
   const [flash, setFlash] = useState<FlashMessage>(null);
 
@@ -18,12 +20,25 @@ export default function ChallengesPage() {
 
   return (
     <div className="page">
-      <section className="card hero">
-        <h1 className="page-title">Hiring based on what you can do</h1>
-        <div className="card-meta">
-          Companies post real problems. You answer under a ghost name. The best work
-          wins, and only then does anyone learn who you are.
-        </div>
+      <section className="hero">
+        <h1 className="display">
+          Hiring based on<br />what you <mark>can do.</mark>
+        </h1>
+        <p className="lede">
+          Companies post real problems. You answer as a ghost. The best work wins,
+          and only then does anyone learn who you are.
+        </p>
+        {session?.role === 'candidate' && (
+          <div className="hero-actions">
+            <Link href="/practice" className="btn">Warm up first</Link>
+            <span className="hero-you">You are <strong>{session.name}</strong></span>
+          </div>
+        )}
+        {session?.role === 'company' && (
+          <div className="hero-actions">
+            <Link href="/post" className="btn btn-accent">Post a challenge</Link>
+          </div>
+        )}
       </section>
 
       <Flash message={flash} />
@@ -36,23 +51,25 @@ export default function ChallengesPage() {
         </div>
       )}
 
-      {(rows ?? []).map(c => (
-        <Link key={c.id} href={`/challenge/${c.id}`} className="card">
-          <div className="row-between">
-            <div>
-              <div className="card-title">{c.title}</div>
-              <div className="card-meta">
-                {c.company} · {c.entries ?? 0} {c.entries === 1 ? 'entry' : 'entries'}
+      {(rows ?? []).map((c, i) => (
+        <Link key={c.id} href={`/challenge/${c.id}`} className="card row-card">
+          <div className="row-index">{String(i + 1).padStart(2, '0')}</div>
+          <div className="row-main">
+            <div className="row-between">
+              <div>
+                <div className="card-title">{c.title}</div>
+                <div className="card-meta">
+                  {c.company} · {c.entries ?? 0} {c.entries === 1 ? 'entry' : 'entries'}
+                </div>
               </div>
+              <Badge tone={c.revealed ? 'good' : 'neutral'}>
+                {c.revealed ? 'Winner announced' : 'Open'}
+              </Badge>
             </div>
-            <Badge tone={c.revealed ? 'good' : 'neutral'}>
-              {c.revealed ? 'Winner announced' : 'Open'}
-            </Badge>
+            <p className="card-body">{c.statement}</p>
+            {c.reward && <div style={{ marginTop: 10 }}><Badge tone="accent">{c.reward}</Badge></div>}
           </div>
-          <p className="card-body">{c.statement}</p>
-          {c.reward && (
-            <div style={{ marginTop: 10 }}><Badge tone="accent">{c.reward}</Badge></div>
-          )}
+          <div className="row-arrow" aria-hidden="true">→</div>
         </Link>
       ))}
     </div>
