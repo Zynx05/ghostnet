@@ -633,14 +633,20 @@ table.data tr.row-me td { background: var(--yellow); }
    not an interface element, and it is what makes a ghost feel like somebody
    rather than a row in a table. */
 .profile-banner {
-  height: 92px;
+  height: 96px;
   border-bottom: var(--border);
-  background: linear-gradient(
-    90deg,
-    var(--red) 0 12%, var(--yellow) 12% 26%, var(--blue) 26% 44%,
-    var(--green) 44% 58%, #f2f0e6 58% 68%, var(--yellow) 68% 82%,
-    var(--ink) 82% 90%, var(--blue) 90% 100%
-  );
+  background-color: var(--ink);
+  background-image:
+    radial-gradient(circle at 74% 52%, var(--yellow) 0 28px, transparent 29px),
+    linear-gradient(
+      90deg,
+      var(--blue) 0 19%,
+      var(--paper) 19% 24%,
+      var(--ink) 24% 60%,
+      var(--red) 60% 63%,
+      var(--ink) 63% 87%,
+      var(--green) 87% 100%
+    );
 }
 
 .profile-head { display: flex; align-items: flex-end; gap: 16px; padding: 0 22px; margin-top: -34px; flex-wrap: wrap; }

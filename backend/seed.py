@@ -104,9 +104,34 @@ CANDIDATES = [
 
 PASSWORD = "demo1234"
 
-# One conversation already going, so the Inbox is not an empty screen during
-# the demo. Challenge 1 belongs to Northwind Retail.
+# Conversations already going, so no demo account opens an empty inbox.
+# Challenge 1 belongs to Northwind Retail, challenge 2 to Vega Logistics, and
+# a company can only write to somebody who entered that challenge.
 CONVERSATION = [
+    # Northwind and the winner.
+    (1, "quiet-falcon", "tap", "company",
+     "You won this one. Your version was the only entry that handled an empty "
+     "cart without us having to ask."),
+    (1, "quiet-falcon", "reply", "ghost",
+     "Thank you. Do you want me to unmask, or can we talk first?"),
+    (1, "quiet-falcon", "reply", "company",
+     "Talk first, always. We have unmasked you on our side so we can raise a "
+     "contract, but nothing goes further without your say so."),
+    (1, "quiet-falcon", "reply", "ghost",
+     "That works. What does the team look like?"),
+    (1, "quiet-falcon", "reply", "company",
+     "Four engineers on checkout, mostly Python. Remote three days a week, "
+     "office in Karachi the other two."),
+
+    # Northwind and the runner up who wrote prose instead of code.
+    (1, "calm-lynx", "whisper", "company",
+     "Ranked second. You described the fix well, but we needed working code "
+     "and there was none. Send code next time and you would have won this."),
+    (1, "calm-lynx", "reply", "ghost",
+     "Fair. I read the brief as asking for an approach. I will submit code "
+     "next time."),
+
+    # Northwind and the thorough one.
     (1, "pale-otter", "tap", "company",
      "We would like to talk. Your cart summary was the most thorough one we read."),
     (1, "pale-otter", "reply", "ghost",
@@ -114,8 +139,40 @@ CONVERSATION = [
     (1, "pale-otter", "reply", "company",
      "Backend work on the checkout team. Four people, mostly Python. "
      "Remote three days a week."),
-    (1, "calm-lynx", "whisper", "company",
-     "Ranked second. Right instinct on validation, but we needed working code."),
+
+    # Northwind and the copier. Blunt, because the score was blunt.
+    (1, "swift-heron", "whisper", "company",
+     "Eighty seven percent of your entry appears word for word in another "
+     "one. We are not taking this further. Send your own work and we will "
+     "read it properly."),
+
+    # Vega and the winner of the rate limiter challenge.
+    (2, "sharp-moth", "tap", "company",
+     "Your sliding window was the cleanest of the two. Are you open to a "
+     "contract, three months to start?"),
+    (2, "sharp-moth", "reply", "ghost",
+     "Possibly. Is it remote, and what is the rate?"),
+    (2, "sharp-moth", "reply", "company",
+     "Fully remote. We pay in dollars, twice a month. Tell us your rate and "
+     "we will work from there."),
+
+    # Vega and the one who explained a token bucket but wrote no code.
+    (2, "bold-fox", "whisper", "company",
+     "Good explanation of a token bucket, and you were right that it handles "
+     "bursts better. We went with the entry that shipped working code."),
+    (2, "bold-fox", "reply", "ghost",
+     "Understood. Are you running more of these?"),
+    (2, "bold-fox", "reply", "company",
+     "Every few weeks. You are on the list."),
+]
+
+# A question asked on the rate limiter challenge, answered by the company.
+# The answer also lands in the asker inbox, which is where the answer kind
+# of message comes from.
+QUESTIONS = [
+    (2, "bold-fox",
+     "Does the limit need to survive a restart, or is in memory fine?",
+     "In memory is fine for this. Say so in your answer if you assume it."),
 ]
 
 SUBMISSIONS = [
@@ -220,6 +277,19 @@ def run():
         db.execute(
             "INSERT INTO submissions (challenge_id, ghost_id, content) VALUES (%s, %s, %s)",
             (challenge_id, ghost_id, content),
+        )
+
+    for challenge_id, ghost_id, question, answer in QUESTIONS:
+        db.execute(
+            "INSERT INTO questions (challenge_id, ghost_id, question, answer)"
+            " VALUES (%s, %s, %s, %s)",
+            (challenge_id, ghost_id, question, answer),
+        )
+        db.execute(
+            "INSERT INTO messages (challenge_id, ghost_id, kind, sender, body)"
+            " VALUES (%s, %s, %s, %s, %s)",
+            (challenge_id, ghost_id, "answer", "company",
+             "You asked: " + question + "\n\nAnswer: " + answer),
         )
 
     for challenge_id, ghost_id, kind, sender, body in CONVERSATION:
