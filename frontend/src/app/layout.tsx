@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './ghostnet.css';
 import { TopNav } from '../components/TopNav';
+import { Footer } from '../components/Footer';
 import { AuthGate } from '../components/AuthGate';
 
 export const metadata: Metadata = {
@@ -20,8 +21,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <TopNav />
-        <main><AuthGate>{children}</AuthGate></main>
+        <div className="shell">
+          <TopNav />
+          <main><AuthGate>{children}</AuthGate></main>
+          <Footer />
+        </div>
       </body>
     </html>
   );
