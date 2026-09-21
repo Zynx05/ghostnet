@@ -13,17 +13,21 @@ export interface Challenge {
   start_day: number;
   end_day: number;
   revealed: boolean;
+  practice: boolean;
+  entries?: number;
   created_at?: string;
 }
 
 export interface Submission {
   id: number;
   ghost_id: string;
+  ghost_name: string;
   content: string;
 }
 
 export interface RankedRow {
   ghost_id: string;
+  ghost_name: string;
   relevance: number;
   quality: number;
   structure: number;
@@ -46,12 +50,70 @@ export interface ProofStep {
 
 export interface RevealResponse {
   winner: RankedRow;
-  /** Null until the company presses reveal. Anonymity lives in the type too. */
+  /** Empty when the winner never gave a name. masked says so directly. */
   real_name: string;
+  masked: boolean;
   merkle_root: string;
   leaf: string;
   proof: ProofStep[];
   leaf_count: number;
+}
+
+export interface PracticeResult {
+  would_rank: number;
+  out_of: number;
+  scores: RankedRow;
+}
+
+export interface Message {
+  id: number;
+  kind: 'tap' | 'whisper' | 'answer';
+  body: string;
+  created_at: string;
+  challenge_id: number;
+  title: string;
+  company: string;
+}
+
+export interface Question {
+  id: number;
+  ghost_id: string;
+  ghost_name: string;
+  question: string;
+  answer: string;
+}
+
+export interface MyEntry {
+  challenge_id: number;
+  title: string;
+  company: string;
+  revealed: boolean;
+  ghost_id: string;
+  rank: number | null;
+  final_score: number | null;
+}
+
+export interface MyPractice {
+  challenge_id: number;
+  title: string;
+  would_rank: number;
+  out_of: number;
+  final_score: number;
+}
+
+export interface MyPage {
+  ghost: { ghost_id: string; name: string; real_name: string };
+  entries: MyEntry[];
+  practice: MyPractice[];
+  proofs: (MyEntry & { seal: string })[];
+  check_code: string;
+}
+
+export interface LeaderRow {
+  ghost_id: string;
+  name: string;
+  entries: number;
+  wins: number;
 }
 
 export interface ChainBlock {
@@ -60,6 +122,7 @@ export interface ChainBlock {
   previous_hash: string;
   hash: string;
   ghost_id: string;
+  ghost_name: string;
   title: string;
   company: string;
   score: number;

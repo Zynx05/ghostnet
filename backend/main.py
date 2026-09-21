@@ -1,20 +1,26 @@
 """
 GhostNet API.
 Member 2 owns this file. It stays thin on purpose: every route validates the
-input, calls one algorithm module, and returns JSON. No logic lives here.
+input, calls one module, and returns JSON. No logic lives here.
 
 Run it with:  uvicorn main:app --reload
+
+Who is who
+    A person is a ghost. The browser sends X-Ghost-Token and that is the
+    whole login. There are no passwords and no email addresses.
+    A company is whoever is looking at a challenge page. This is an MVP, so
+    the company side has no login either.
 """
 
 import os
-import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import db
+import ghosts
 from algorithms import ranker, merkle, gale_shapley, scheduling
 
 
@@ -29,7 +35,7 @@ async def lifespan(app: FastAPI):
     db.pool.close()
 
 
-app = FastAPI(title="GhostNet API", version="1.0", lifespan=lifespan)
+app = FastAPI(title="GhostNet API", version="2.0", lifespan=lifespan)
 
 # A browser blocks a page on one address from calling an API on another unless
 # the API says that address is allowed. Locally that is port 3000. Once the
@@ -44,13 +50,13 @@ ALLOWED_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    # Vercel gives every deployment its own address, so the preview URLs are
-    # matched by pattern rather than listed one by one.
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+# ── Request shapes ───────────────────────────────────────────────────────
 
 class NewChallenge(BaseModel):
     title: str
@@ -61,9 +67,26 @@ class NewChallenge(BaseModel):
     end_day: int = 7
 
 
-class NewSubmission(BaseModel):
+class Content(BaseModel):
     content: str
+
+
+class NameUpdate(BaseModel):
     real_name: str
+
+
+class NewMessage(BaseModel):
+    ghost_id: str
+    kind: str
+    body: str = ""
+
+
+class NewQuestion(BaseModel):
+    question: str
+
+
+class Answer(BaseModel):
+    answer: str
 
 
 class MatchInput(BaseModel):
@@ -71,27 +94,120 @@ class MatchInput(BaseModel):
     companies: dict
 
 
-# Member 6 owns this one. CI and the hosting platform poll it.
-@app.get("/health")
-def health():
-    return {"status": "ok", "service": "ghostnet"}
+# ── Helpers ──────────────────────────────────────────────────────────────
+
+def me(token):
+    """The ghost behind this request, or a 401 if the token is missing or wrong."""
+    if not token:
+        raise HTTPException(401, "no ghost token")
+    ghost = ghosts.by_token(token)
+    if not ghost:
+        raise HTTPException(401, "unknown ghost")
+    return ghost
 
 
-@app.get("/challenges")
-def list_challenges():
-    return db.query("SELECT * FROM challenges ORDER BY id DESC")
-
-
-@app.get("/challenges/{challenge_id}")
-def get_challenge(challenge_id: int):
+def challenge_or_404(challenge_id):
     rows = db.query("SELECT * FROM challenges WHERE id = %s", (challenge_id,))
     if not rows:
         raise HTTPException(404, "challenge not found")
     return rows[0]
 
 
+def with_names(rows):
+    """Attach the display name to every row that has a ghost_id."""
+    names = ghosts.names_for(sorted({r["ghost_id"] for r in rows}))
+    for r in rows:
+        r["ghost_name"] = names.get(r["ghost_id"], r["ghost_id"])
+    return rows
+
+
+# ── Health ───────────────────────────────────────────────────────────────
+
+# Member 6 owns this one. CI and the hosting platform poll it.
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "ghostnet"}
+
+
+# ── Ghosts ───────────────────────────────────────────────────────────────
+
+@app.post("/ghosts")
+def new_ghost():
+    """A browser calls this once and keeps the token."""
+    return ghosts.create()
+
+
+@app.get("/me")
+def my_page(x_ghost_token: str = Header(default="")):
+    """Everything on the My Ghost page in one call."""
+    g = me(x_ghost_token)
+
+    entries = with_names(db.query(
+        "SELECT s.challenge_id, c.title, c.company, c.revealed, s.ghost_id,"
+        " r.rank, r.final_score"
+        " FROM submissions s"
+        " JOIN challenges c ON c.id = s.challenge_id"
+        " LEFT JOIN results r ON r.challenge_id = s.challenge_id"
+        "   AND r.ghost_id = s.ghost_id"
+        " WHERE s.ghost_id = %s ORDER BY s.id DESC",
+        (g["ghost_id"],),
+    ))
+
+    practice = db.query(
+        "SELECT p.challenge_id, c.title, p.would_rank, p.out_of, p.final_score"
+        " FROM practice p JOIN challenges c ON c.id = p.challenge_id"
+        " WHERE p.ghost_id = %s ORDER BY p.id DESC",
+        (g["ghost_id"],),
+    )
+
+    wins = [e for e in entries if e["rank"] == 1 and e["revealed"]]
+    leaves = [w["ghost_id"] + " won " + w["title"] + " at " + w["company"] for w in wins]
+
+    return {
+        "ghost": g,
+        "entries": entries,
+        "practice": practice,
+        "proofs": [
+            {**w, "seal": block["hash"]}
+            for w, block in zip(wins, merkle.chain(leaves))
+        ],
+        "check_code": merkle.root(leaves) if leaves else "",
+    }
+
+
+@app.patch("/me")
+def set_name(body: NameUpdate, x_ghost_token: str = Header(default="")):
+    """The real name is optional and is only ever shown if the ghost wins."""
+    g = me(x_ghost_token)
+    db.execute(
+        "UPDATE ghosts SET real_name = %s WHERE ghost_id = %s",
+        (body.real_name.strip(), g["ghost_id"]),
+    )
+    return {"ok": True}
+
+
+# ── Challenges ───────────────────────────────────────────────────────────
+
+@app.get("/challenges")
+def list_challenges():
+    rows = db.query(
+        "SELECT c.*, COUNT(s.id) AS entries"
+        " FROM challenges c LEFT JOIN submissions s ON s.challenge_id = c.id"
+        " WHERE NOT c.practice"
+        " GROUP BY c.id ORDER BY c.id DESC"
+    )
+    return rows
+
+
+@app.get("/challenges/{challenge_id}")
+def get_challenge(challenge_id: int):
+    return challenge_or_404(challenge_id)
+
+
 @app.post("/challenges")
 def create_challenge(body: NewChallenge):
+    if not body.title.strip() or not body.statement.strip():
+        raise HTTPException(400, "a title and a problem are both needed")
     new_id = db.execute(
         "INSERT INTO challenges (title, company, statement, reward, start_day, end_day)"
         " VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
@@ -104,38 +220,53 @@ def create_challenge(body: NewChallenge):
 @app.get("/challenges/{challenge_id}/submissions")
 def list_submissions(challenge_id: int):
     """
-    Note the column list. real_name is never selected here, so anonymity is not
-    a rule someone has to remember, it is simply absent from the query.
+    Note the column list. Nothing here joins to the ghosts table for a real
+    name, so anonymity is not a rule someone has to remember, it is simply
+    absent from the query.
     """
-    return db.query(
-        "SELECT id, ghost_id, content FROM submissions WHERE challenge_id = %s",
+    return with_names(db.query(
+        "SELECT id, ghost_id, content FROM submissions WHERE challenge_id = %s"
+        " ORDER BY id",
         (challenge_id,),
-    )
+    ))
 
 
 @app.post("/challenges/{challenge_id}/submissions")
-def add_submission(challenge_id: int, body: NewSubmission):
+def add_submission(challenge_id: int, body: Content,
+                   x_ghost_token: str = Header(default="")):
+    g = me(x_ghost_token)
+    c = challenge_or_404(challenge_id)
+    if c["revealed"]:
+        raise HTTPException(400, "this challenge is closed. Try it under Practice")
     if not body.content.strip():
-        raise HTTPException(400, "submission is empty")
-    ghost_id = "ghost_" + uuid.uuid4().hex[:6]
-    db.execute(
-        "INSERT INTO submissions (challenge_id, ghost_id, content, real_name)"
-        " VALUES (%s, %s, %s, %s)",
-        (challenge_id, ghost_id, body.content, body.real_name),
-    )
-    return {"ghost_id": ghost_id}
+        raise HTTPException(400, "the entry is empty")
 
+    already = db.query(
+        "SELECT 1 FROM submissions WHERE challenge_id = %s AND ghost_id = %s",
+        (challenge_id, g["ghost_id"]),
+    )
+    if already:
+        raise HTTPException(400, "you already entered this one")
+
+    db.execute(
+        "INSERT INTO submissions (challenge_id, ghost_id, content) VALUES (%s, %s, %s)",
+        (challenge_id, g["ghost_id"], body.content),
+    )
+    return {"ghost_id": g["ghost_id"], "ghost_name": g["name"]}
+
+
+# ── Ranking and reveal ───────────────────────────────────────────────────
 
 @app.post("/challenges/{challenge_id}/rank")
 def rank(challenge_id: int):
     """The demo button. Every scoring algorithm runs inside this one call."""
-    challenge = get_challenge(challenge_id)
+    challenge = challenge_or_404(challenge_id)
     subs = db.query(
         "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s",
         (challenge_id,),
     )
     if not subs:
-        raise HTTPException(400, "nothing has been submitted yet")
+        raise HTTPException(400, "nothing has been entered yet")
 
     rows = ranker.score_all(challenge["statement"], subs)
 
@@ -149,21 +280,21 @@ def rank(challenge_id: int):
              r["structure"], r["cyclomatic"], r["plagiarism"],
              r["longest_copied"], r["final_score"], r["rank"]),
         )
-    return {"weights": ranker.WEIGHTS, "results": rows}
+    return {"weights": ranker.WEIGHTS, "results": with_names(rows)}
 
 
 @app.get("/challenges/{challenge_id}/results")
 def get_results(challenge_id: int):
-    return db.query(
+    return with_names(db.query(
         "SELECT * FROM results WHERE challenge_id = %s ORDER BY rank",
         (challenge_id,),
-    )
+    ))
 
 
 @app.post("/challenges/{challenge_id}/reveal")
 def reveal(challenge_id: int):
     """
-    The winner is unmasked and the win is written into the proof chain.
+    The winner is unmasked, if they chose to be, and the win is sealed.
     The Merkle proof returned here lets anyone check the win on their own.
     """
     results = get_results(challenge_id)
@@ -171,60 +302,199 @@ def reveal(challenge_id: int):
         raise HTTPException(400, "run the ranking first")
 
     winner = results[0]
-    name = db.query(
-        "SELECT real_name FROM submissions WHERE ghost_id = %s",
-        (winner["ghost_id"],),
+    # The one query in the whole codebase that reads a real name.
+    row = db.query(
+        "SELECT real_name FROM ghosts WHERE ghost_id = %s", (winner["ghost_id"],)
     )
+    real_name = row[0]["real_name"] if row else ""
     db.execute("UPDATE challenges SET revealed = TRUE WHERE id = %s", (challenge_id,))
 
     leaves = [r["ghost_id"] + ":" + str(r["final_score"]) for r in results]
-    index = 0
     return {
         "winner": winner,
-        "real_name": name[0]["real_name"] if name else "unknown",
+        "real_name": real_name,
+        "masked": real_name == "",
         "merkle_root": merkle.root(leaves),
-        "leaf": leaves[index],
-        "proof": merkle.proof_for(leaves, index),
+        "leaf": leaves[0],
+        "proof": merkle.proof_for(leaves, 0),
         "leaf_count": len(leaves),
     }
 
 
+# ── Practice ─────────────────────────────────────────────────────────────
+
+@app.get("/practice")
+def practice_list():
+    """Closed challenges plus the warm ups. Anything you can try without stakes."""
+    return db.query(
+        "SELECT c.*, COUNT(s.id) AS entries"
+        " FROM challenges c LEFT JOIN submissions s ON s.challenge_id = c.id"
+        " WHERE c.revealed OR c.practice"
+        " GROUP BY c.id ORDER BY c.practice DESC, c.id DESC"
+    )
+
+
+@app.post("/challenges/{challenge_id}/practice")
+def practice_attempt(challenge_id: int, body: Content,
+                     x_ghost_token: str = Header(default="")):
+    """
+    Score this entry against the real ones and say where it would have landed.
+    Nothing is written to results, so the real ranking is untouched.
+    """
+    g = me(x_ghost_token)
+    c = challenge_or_404(challenge_id)
+    if not (c["revealed"] or c["practice"]):
+        raise HTTPException(400, "this one is still open. Enter it for real")
+    if not body.content.strip():
+        raise HTTPException(400, "the entry is empty")
+
+    subs = db.query(
+        "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s",
+        (challenge_id,),
+    )
+    subs.append({"ghost_id": "__you__", "content": body.content})
+    rows = ranker.score_all(c["statement"], subs)
+    mine = next(r for r in rows if r["ghost_id"] == "__you__")
+
+    db.execute(
+        "INSERT INTO practice (challenge_id, ghost_id, would_rank, out_of, final_score)"
+        " VALUES (%s, %s, %s, %s, %s)",
+        (challenge_id, g["ghost_id"], mine["rank"], len(rows), mine["final_score"]),
+    )
+    return {"would_rank": mine["rank"], "out_of": len(rows), "scores": mine}
+
+
+# ── Inbox, taps, whispers ────────────────────────────────────────────────
+
+@app.get("/inbox")
+def inbox(x_ghost_token: str = Header(default="")):
+    g = me(x_ghost_token)
+    return db.query(
+        "SELECT m.id, m.kind, m.body, m.created_at, m.challenge_id,"
+        " c.title, c.company"
+        " FROM messages m JOIN challenges c ON c.id = m.challenge_id"
+        " WHERE m.ghost_id = %s ORDER BY m.id DESC",
+        (g["ghost_id"],),
+    )
+
+
+@app.post("/challenges/{challenge_id}/messages")
+def send_message(challenge_id: int, body: NewMessage):
+    """
+    A company reaches a ghost. A tap says we would like to talk. A whisper is
+    one line of feedback. Either way the ghost decides what happens next.
+    """
+    challenge_or_404(challenge_id)
+    if body.kind not in ("tap", "whisper"):
+        raise HTTPException(400, "kind must be tap or whisper")
+    entered = db.query(
+        "SELECT 1 FROM submissions WHERE challenge_id = %s AND ghost_id = %s",
+        (challenge_id, body.ghost_id),
+    )
+    if not entered:
+        raise HTTPException(400, "that ghost did not enter this challenge")
+
+    text = body.body.strip() or (
+        "We would like to talk. Reply here if you want to unmask."
+        if body.kind == "tap" else ""
+    )
+    if not text:
+        raise HTTPException(400, "a whisper needs some words")
+
+    db.execute(
+        "INSERT INTO messages (ghost_id, challenge_id, kind, body) VALUES (%s, %s, %s, %s)",
+        (body.ghost_id, challenge_id, body.kind, text),
+    )
+    return {"ok": True}
+
+
+# ── Questions on a challenge ─────────────────────────────────────────────
+
+@app.get("/challenges/{challenge_id}/questions")
+def list_questions(challenge_id: int):
+    return with_names(db.query(
+        "SELECT id, ghost_id, question, answer FROM questions"
+        " WHERE challenge_id = %s ORDER BY id",
+        (challenge_id,),
+    ))
+
+
+@app.post("/challenges/{challenge_id}/questions")
+def ask(challenge_id: int, body: NewQuestion, x_ghost_token: str = Header(default="")):
+    g = me(x_ghost_token)
+    challenge_or_404(challenge_id)
+    if not body.question.strip():
+        raise HTTPException(400, "ask something")
+    db.execute(
+        "INSERT INTO questions (challenge_id, ghost_id, question) VALUES (%s, %s, %s)",
+        (challenge_id, g["ghost_id"], body.question.strip()),
+    )
+    return {"ok": True}
+
+
+@app.post("/questions/{question_id}/answer")
+def answer(question_id: int, body: Answer):
+    """The company answers. Everyone sees it, and the asker also gets it in their inbox."""
+    rows = db.query("SELECT * FROM questions WHERE id = %s", (question_id,))
+    if not rows:
+        raise HTTPException(404, "question not found")
+    q = rows[0]
+    db.execute(
+        "UPDATE questions SET answer = %s WHERE id = %s",
+        (body.answer.strip(), question_id),
+    )
+    db.execute(
+        "INSERT INTO messages (ghost_id, challenge_id, kind, body) VALUES (%s, %s, %s, %s)",
+        (q["ghost_id"], q["challenge_id"], "answer",
+         "You asked: " + q["question"] + "\n\nAnswer: " + body.answer.strip()),
+    )
+    return {"ok": True}
+
+
+# ── Leaderboard ──────────────────────────────────────────────────────────
+
+@app.get("/leaderboard")
+def leaderboard():
+    """Ghosts by verified wins, then by entries. Names only, never people."""
+    return db.query(
+        "SELECT g.ghost_id, g.name,"
+        " COUNT(DISTINCT s.id) AS entries,"
+        " COUNT(DISTINCT CASE WHEN r.rank = 1 AND c.revealed THEN r.id END) AS wins"
+        " FROM ghosts g"
+        " LEFT JOIN submissions s ON s.ghost_id = g.ghost_id"
+        " LEFT JOIN results r ON r.ghost_id = g.ghost_id AND r.challenge_id = s.challenge_id"
+        " LEFT JOIN challenges c ON c.id = s.challenge_id"
+        " GROUP BY g.ghost_id, g.name"
+        " HAVING COUNT(DISTINCT s.id) > 0"
+        " ORDER BY wins DESC, entries DESC, g.name"
+        " LIMIT 50"
+    )
+
+
+# ── Skill proof chain ────────────────────────────────────────────────────
+
 @app.get("/chain")
 def proof_chain():
-    """
-    Every revealed win so far, linked block by block.
-
-    The details of each win are returned beside the hashes so the credential
-    page can show what was won, not only that something was.
-    """
-    wins = db.query(
+    """Every revealed win so far, linked block by block."""
+    wins = with_names(db.query(
         "SELECT c.title, c.company, r.ghost_id, r.final_score"
         " FROM results r JOIN challenges c ON c.id = r.challenge_id"
         " WHERE r.rank = 1 AND c.revealed ORDER BY c.id",
-    )
-    records = [
-        w["ghost_id"] + " won " + w["title"] + " at " + w["company"]
-        for w in wins
+    ))
+    records = [w["ghost_id"] + " won " + w["title"] + " at " + w["company"] for w in wins]
+    blocks = [
+        {**block, "ghost_id": w["ghost_id"], "ghost_name": w["ghost_name"],
+         "title": w["title"], "company": w["company"], "score": w["final_score"]}
+        for block, w in zip(merkle.chain(records), wins)
     ]
-
-    blocks = []
-    for block, win in zip(merkle.chain(records), wins):
-        blocks.append({
-            **block,
-            "ghost_id": win["ghost_id"],
-            "title": win["title"],
-            "company": win["company"],
-            "score": win["final_score"],
-        })
-
     return {
         "blocks": blocks,
         "merkle_root": merkle.root(records),
-        # One line per ghost id, so the page can show a credential per person
-        # rather than one flat list of everybody's wins.
         "holders": sorted({w["ghost_id"] for w in wins}),
     }
 
+
+# ── Side pages, kept for the viva ────────────────────────────────────────
 
 @app.post("/match")
 def match(body: MatchInput):
@@ -235,10 +505,9 @@ def match(body: MatchInput):
 @app.get("/schedule")
 def schedule():
     """Member 9. Picks the challenge windows that fit without overlapping."""
-    rows = db.query("SELECT id, title, start_day, end_day FROM challenges")
+    rows = db.query("SELECT id, title, start_day, end_day FROM challenges WHERE NOT practice")
     windows = [
-        {"id": r["id"], "title": r["title"],
-         "start": r["start_day"], "end": r["end_day"]}
+        {"id": r["id"], "title": r["title"], "start": r["start_day"], "end": r["end_day"]}
         for r in rows
     ]
     return scheduling.select_windows(windows)

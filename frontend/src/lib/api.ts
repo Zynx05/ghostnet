@@ -1,20 +1,28 @@
 /**
  * Every call to the FastAPI backend goes through this file.
- * One place to change the address, one place that handles an error.
+ * One place to change the address, one place that handles an error, and one
+ * place that attaches the ghost token so the server knows who is asking.
  */
 
+import { readGhost } from './ghost';
 import type {
   Challenge, Submission, RankResponse, RankedRow, RevealResponse,
+  PracticeResult, Message, Question, MyPage, LeaderRow,
   ChainBlock, ScheduleResponse, MatchResponse,
 } from './types';
 
 const BASE = process.env.NEXT_PUBLIC_API ?? 'http://localhost:8000';
 
 async function call<T>(path: string, options?: RequestInit): Promise<T> {
+  const ghost = readGhost();
   const res = await fetch(BASE + path, {
-    headers: { 'Content-Type': 'application/json' },
-    cache: 'no-store',
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(ghost ? { 'X-Ghost-Token': ghost.token } : {}),
+      ...(options?.headers ?? {}),
+    },
+    cache: 'no-store',
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
@@ -23,36 +31,52 @@ async function call<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+const post = (body: unknown) => ({ method: 'POST', body: JSON.stringify(body) });
+
 export const api = {
+  // Challenges
   challenges: () => call<Challenge[]>('/challenges'),
-
   challenge: (id: number) => call<Challenge>(`/challenges/${id}`),
+  createChallenge: (body: Partial<Challenge>) => call<{ id: number }>('/challenges', post(body)),
 
-  createChallenge: (body: Partial<Challenge>) =>
-    call<{ id: number }>('/challenges', { method: 'POST', body: JSON.stringify(body) }),
-
+  // Entries
   submissions: (id: number) => call<Submission[]>(`/challenges/${id}/submissions`),
+  submit: (id: number, content: string) =>
+    call<{ ghost_id: string; ghost_name: string }>(`/challenges/${id}/submissions`, post({ content })),
 
-  submit: (id: number, content: string, real_name: string) =>
-    call<{ ghost_id: string }>(`/challenges/${id}/submissions`, {
-      method: 'POST',
-      body: JSON.stringify({ content, real_name }),
-    }),
-
+  // Ranking
   rank: (id: number) => call<RankResponse>(`/challenges/${id}/rank`, { method: 'POST' }),
-
-  /** The scores from the last ranking run, without scoring again. */
   results: (id: number) => call<RankedRow[]>(`/challenges/${id}/results`),
-
   reveal: (id: number) => call<RevealResponse>(`/challenges/${id}/reveal`, { method: 'POST' }),
 
+  // Practice
+  practiceList: () => call<Challenge[]>('/practice'),
+  practice: (id: number, content: string) =>
+    call<PracticeResult>(`/challenges/${id}/practice`, post({ content })),
+
+  // Inbox and messages from companies
+  inbox: () => call<Message[]>('/inbox'),
+  message: (id: number, ghost_id: string, kind: 'tap' | 'whisper', body = '') =>
+    call<{ ok: true }>(`/challenges/${id}/messages`, post({ ghost_id, kind, body })),
+
+  // Questions on a challenge
+  questions: (id: number) => call<Question[]>(`/challenges/${id}/questions`),
+  ask: (id: number, question: string) =>
+    call<{ ok: true }>(`/challenges/${id}/questions`, post({ question })),
+  answer: (questionId: number, answer: string) =>
+    call<{ ok: true }>(`/questions/${questionId}/answer`, post({ answer })),
+
+  // Me
+  me: () => call<MyPage>('/me'),
+  setName: (real_name: string) =>
+    call<{ ok: true }>('/me', { method: 'PATCH', body: JSON.stringify({ real_name }) }),
+
+  // Leaderboard and the proof chain
+  leaderboard: () => call<LeaderRow[]>('/leaderboard'),
   chain: () => call<{ blocks: ChainBlock[]; merkle_root: string; holders: string[] }>('/chain'),
 
+  // Side pages kept for the viva
   schedule: () => call<ScheduleResponse>('/schedule'),
-
   match: (candidates: Record<string, string[]>, companies: Record<string, string[]>) =>
-    call<MatchResponse>('/match', {
-      method: 'POST',
-      body: JSON.stringify({ candidates, companies }),
-    }),
+    call<MatchResponse>('/match', post({ candidates, companies })),
 };

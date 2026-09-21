@@ -56,7 +56,7 @@ export default function ChainPage() {
                   className={h === who ? 'btn btn-accent' : 'btn'}
                   onClick={() => setWho(h)}
                 >
-                  {h}
+                  {blocks?.find(b => b.ghost_id === h)?.ghost_name ?? h}
                 </button>
               ))}
             </div>
@@ -67,7 +67,7 @@ export default function ChainPage() {
             <div className="credential-head">
               <div>
                 <span className="algo-tag">Skill Proof holder</span>
-                <div className="credential-id">{who}</div>
+                <div className="credential-id">{mine[0]?.ghost_name ?? who}</div>
               </div>
               <div className="credential-count">
                 <div className="credential-count-n">{mine.length}</div>

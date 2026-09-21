@@ -20,13 +20,20 @@ Railway sets DATABASE_URL to a PostgreSQL address, so deployment is unaffected
 by the local default. CI runs the api job against a real PostgreSQL container,
 which is what stops the two paths drifting apart.
 
-Three tables and nothing else.
+Seven tables.
 
-challenges   what a company posted
-submissions  anonymous work. The real name sits in a column the ranking
-             queries never select, so hiding names is not a rule somebody has
-             to remember, it is simply absent from the SQL
+ghosts       one row per person. The ghost id is the only identity the rest
+             of the system ever sees. The real name sits here, optional, and
+             the ranking queries never join to it, so hiding names is not a
+             rule somebody has to remember, it is simply absent from the SQL
+challenges   what a company posted. practice marks warm up challenges with
+             no company behind them
+submissions  anonymous work, one per ghost per challenge
 results      the scores produced by one ranking run
+practice     where a ghost would have ranked on a closed challenge. Never
+             touches results
+messages     the inbox. Taps and whispers from companies, answers to questions
+questions    asked on a challenge, answered by the company, visible to all
 """
 
 import os
@@ -48,99 +55,114 @@ IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 
 # ── Schema ───────────────────────────────────────────────────────────────
-# The same three tables in both dialects. The differences are only in the
-# type names and in how an auto incrementing id is declared.
+# One schema, written once. The four tokens below are the only places the two
+# dialects disagree, so they are filled in at import time.
 
-POSTGRES_SCHEMA = """
+SCHEMA_TEMPLATE = """
+CREATE TABLE IF NOT EXISTS ghosts (
+    id          {PK},
+    ghost_id    TEXT    NOT NULL UNIQUE,
+    name        TEXT    NOT NULL,
+    token       TEXT    NOT NULL UNIQUE,
+    real_name   TEXT    NOT NULL DEFAULT '',
+    created_at  {TS}
+);
+
 CREATE TABLE IF NOT EXISTS challenges (
-    id          SERIAL PRIMARY KEY,
+    id          {PK},
     title       TEXT    NOT NULL,
     company     TEXT    NOT NULL,
     statement   TEXT    NOT NULL,
     reward      TEXT    NOT NULL DEFAULT '',
     start_day   INTEGER NOT NULL DEFAULT 0,
     end_day     INTEGER NOT NULL DEFAULT 7,
-    revealed    BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    revealed    BOOLEAN NOT NULL DEFAULT {FALSE},
+    practice    BOOLEAN NOT NULL DEFAULT {FALSE},
+    created_at  {TS}
 );
 
 CREATE TABLE IF NOT EXISTS submissions (
-    id            SERIAL PRIMARY KEY,
+    id            {PK},
     challenge_id  INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
-    ghost_id      TEXT    NOT NULL UNIQUE,
+    ghost_id      TEXT    NOT NULL REFERENCES ghosts(ghost_id) ON DELETE CASCADE,
     content       TEXT    NOT NULL,
-    real_name     TEXT    NOT NULL,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at    {TS},
+    UNIQUE (challenge_id, ghost_id)
 );
 
 CREATE TABLE IF NOT EXISTS results (
-    id              SERIAL PRIMARY KEY,
+    id              {PK},
     challenge_id    INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
     ghost_id        TEXT    NOT NULL,
-    relevance       DOUBLE PRECISION,
-    quality         DOUBLE PRECISION,
-    structure       DOUBLE PRECISION,
+    relevance       {REAL},
+    quality         {REAL},
+    structure       {REAL},
     cyclomatic      INTEGER,
-    plagiarism      DOUBLE PRECISION,
+    plagiarism      {REAL},
     longest_copied  TEXT,
-    final_score     DOUBLE PRECISION,
+    final_score     {REAL},
     rank            INTEGER,
     UNIQUE (challenge_id, ghost_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_sub_challenge ON submissions(challenge_id);
-CREATE INDEX IF NOT EXISTS idx_res_challenge ON results(challenge_id, rank);
-"""
-
-SQLITE_SCHEMA = """
-CREATE TABLE IF NOT EXISTS challenges (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    title       TEXT    NOT NULL,
-    company     TEXT    NOT NULL,
-    statement   TEXT    NOT NULL,
-    reward      TEXT    NOT NULL DEFAULT '',
-    start_day   INTEGER NOT NULL DEFAULT 0,
-    end_day     INTEGER NOT NULL DEFAULT 7,
-    revealed    BOOLEAN NOT NULL DEFAULT 0,
-    created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS submissions (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS practice (
+    id            {PK},
     challenge_id  INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
-    ghost_id      TEXT    NOT NULL UNIQUE,
-    content       TEXT    NOT NULL,
-    real_name     TEXT    NOT NULL,
-    created_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ghost_id      TEXT    NOT NULL REFERENCES ghosts(ghost_id) ON DELETE CASCADE,
+    would_rank    INTEGER NOT NULL,
+    out_of        INTEGER NOT NULL,
+    final_score   {REAL},
+    created_at    {TS}
 );
 
-CREATE TABLE IF NOT EXISTS results (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    challenge_id    INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
-    ghost_id        TEXT    NOT NULL,
-    relevance       REAL,
-    quality         REAL,
-    structure       REAL,
-    cyclomatic      INTEGER,
-    plagiarism      REAL,
-    longest_copied  TEXT,
-    final_score     REAL,
-    rank            INTEGER,
-    UNIQUE (challenge_id, ghost_id)
+CREATE TABLE IF NOT EXISTS messages (
+    id            {PK},
+    ghost_id      TEXT    NOT NULL REFERENCES ghosts(ghost_id) ON DELETE CASCADE,
+    challenge_id  INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+    kind          TEXT    NOT NULL,
+    body          TEXT    NOT NULL,
+    created_at    {TS}
+);
+
+CREATE TABLE IF NOT EXISTS questions (
+    id            {PK},
+    challenge_id  INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+    ghost_id      TEXT    NOT NULL REFERENCES ghosts(ghost_id) ON DELETE CASCADE,
+    question      TEXT    NOT NULL,
+    answer        TEXT    NOT NULL DEFAULT '',
+    created_at    {TS}
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_challenge ON submissions(challenge_id);
 CREATE INDEX IF NOT EXISTS idx_res_challenge ON results(challenge_id, rank);
+CREATE INDEX IF NOT EXISTS idx_msg_ghost ON messages(ghost_id);
+CREATE INDEX IF NOT EXISTS idx_q_challenge ON questions(challenge_id);
 """
 
-SCHEMA = SQLITE_SCHEMA if IS_SQLITE else POSTGRES_SCHEMA
+DIALECT = {
+    True: {
+        "PK": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "TS": "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+        "REAL": "REAL",
+        "FALSE": "0",
+    },
+    False: {
+        "PK": "SERIAL PRIMARY KEY",
+        "TS": "TIMESTAMPTZ NOT NULL DEFAULT now()",
+        "REAL": "DOUBLE PRECISION",
+        "FALSE": "FALSE",
+    },
+}
+
+SCHEMA = SCHEMA_TEMPLATE.format(**DIALECT[IS_SQLITE])
+
+TABLES = ["questions", "messages", "practice", "results", "submissions",
+          "challenges", "ghosts"]
 
 DROP_ALL = (
-    ["DROP TABLE IF EXISTS results",
-     "DROP TABLE IF EXISTS submissions",
-     "DROP TABLE IF EXISTS challenges"]
+    ["DROP TABLE IF EXISTS " + t for t in TABLES]
     if IS_SQLITE else
-    ["DROP TABLE IF EXISTS results, submissions, challenges CASCADE"]
+    ["DROP TABLE IF EXISTS " + ", ".join(TABLES) + " CASCADE"]
 )
 
 

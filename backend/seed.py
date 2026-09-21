@@ -56,10 +56,47 @@ CHALLENGES = [
         "start_day": 6,
         "end_day": 8,
     },
+    {
+        "title": "Warm up: reverse the words",
+        "company": "GhostNet",
+        "statement": (
+            "Write a function that takes a sentence and returns it with the "
+            "words in reverse order, but each word itself unchanged. Handle "
+            "extra spaces and an empty string without crashing."
+        ),
+        "reward": "",
+        "start_day": 0,
+        "end_day": 0,
+        "practice": True,
+    },
+    {
+        "title": "Warm up: explain a bug to a customer",
+        "company": "GhostNet",
+        "statement": (
+            "A customer reports that their invoice total is wrong. Write the "
+            "reply you would send them in under one hundred words. Be honest "
+            "about the cause, say what happens next, and do not use jargon."
+        ),
+        "reward": "",
+        "start_day": 0,
+        "end_day": 0,
+        "practice": True,
+    },
+]
+
+# The people behind the seeded entries. Names are made up. The real name is
+# optional in the product, so one of these leaves it blank on purpose.
+GHOSTS = [
+    ("quiet-falcon", "Quiet Falcon", "Bilal Ahmed"),
+    ("pale-otter", "Pale Otter", "Ayesha Khan"),
+    ("swift-heron", "Swift Heron", "Hira Sheikh"),
+    ("calm-lynx", "Calm Lynx", "Usman Tariq"),
+    ("sharp-moth", "Sharp Moth", "Sana Malik"),
+    ("bold-fox", "Bold Fox", ""),
 ]
 
 SUBMISSIONS = [
-    (1, "Bilal Ahmed",
+    (1, "quiet-falcon",
      "def validate_cart_total(items):\n"
      "    # An empty cart is a valid cart, so it returns a zero total.\n"
      "    if not items:\n"
@@ -74,7 +111,7 @@ SUBMISSIONS = [
      "# One pass over the cart items, so the cost is O(n) in the item count.\n"
      "# Zero quantity and invalid price are both handled by the guards above.\n"),
 
-    (1, "Ayesha Khan",
+    (1, "pale-otter",
      SHARED_BLOCK +
      "\n"
      "def cart_summary(items):\n"
@@ -87,16 +124,16 @@ SUBMISSIONS = [
      "# An empty cart never enters the loop, so the total stays zero.\n"
      "# Nothing raises on a missing price, the item is simply not counted.\n"),
 
-    (1, "Hira Sheikh",
+    (1, "swift-heron",
      SHARED_BLOCK +
      "# Submitted as is.\n"),
 
-    (1, "Usman Tariq",
+    (1, "calm-lynx",
      "I would fix this by checking every item first. The quantity and the "
      "price both need to be valid numbers before they are multiplied, "
      "otherwise the answer comes out wrong."),
 
-    (2, "Sana Malik",
+    (2, "sharp-moth",
      "class RateLimiter:\n"
      "    def __init__(self, limit=60, window=60):\n"
      "        self.limit = limit\n"
@@ -113,7 +150,7 @@ SUBMISSIONS = [
      "# A sliding window per client, held in a deque style list.\n"
      "# Sixty requests per minute, anything above that is rejected.\n"),
 
-    (2, "Farhan Qureshi",
+    (2, "bold-fox",
      "Use a token bucket. Each client gets sixty tokens per minute and every "
      "request spends one. The bucket refills at a steady rate, which smooths "
      "out short bursts instead of rejecting them outright."),
@@ -125,22 +162,28 @@ def run():
     # data behind and the row ids stay predictable for the presentation.
     db.reset()
 
+    for i, (ghost_id, name, real_name) in enumerate(GHOSTS, start=1):
+        db.execute(
+            "INSERT INTO ghosts (ghost_id, name, token, real_name) VALUES (%s, %s, %s, %s)",
+            (ghost_id, name, "seed-token-%d" % i, real_name),
+        )
+
     for c in CHALLENGES:
         db.execute(
-            "INSERT INTO challenges (title, company, statement, reward, start_day, end_day)"
-            " VALUES (%s, %s, %s, %s, %s, %s)",
+            "INSERT INTO challenges (title, company, statement, reward, start_day, end_day, practice)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s)",
             (c["title"], c["company"], c["statement"], c["reward"],
-             c["start_day"], c["end_day"]),
+             c["start_day"], c["end_day"], c.get("practice", False)),
         )
 
-    for i, (challenge_id, name, content) in enumerate(SUBMISSIONS, start=1):
+    for challenge_id, ghost_id, content in SUBMISSIONS:
         db.execute(
-            "INSERT INTO submissions (challenge_id, ghost_id, content, real_name)"
-            " VALUES (%s, %s, %s, %s)",
-            (challenge_id, "ghost_%03d" % i, content, name),
+            "INSERT INTO submissions (challenge_id, ghost_id, content) VALUES (%s, %s, %s)",
+            (challenge_id, ghost_id, content),
         )
 
-    print("seeded", len(CHALLENGES), "challenges and", len(SUBMISSIONS), "submissions")
+    print("seeded", len(GHOSTS), "ghosts,", len(CHALLENGES), "challenges and",
+          len(SUBMISSIONS), "submissions")
     print("database:", db.DATABASE_URL)
 
 
