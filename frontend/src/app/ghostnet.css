@@ -33,7 +33,16 @@
   --slow: 420ms;
 }
 
-html { background: var(--paper); }
+html { background: var(--paper); scrollbar-color: var(--ink) var(--paper); scrollbar-width: thin; }
+
+/* The system scrollbar is grey and soft, which fights everything else on the
+   page. These rules only affect browsers that support them, and the page is
+   fine without them. */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--paper); border-left: 2px solid var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--ink); border: 2px solid var(--paper); }
+::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+::-webkit-scrollbar-corner { background: var(--paper); }
 
 body {
   font-family: var(--font);
@@ -128,7 +137,7 @@ strong { font-weight: 700; }
 
 .brand:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
 
-.topnav-links { display: flex; gap: 22px; margin-left: 10px; margin-right: auto; overflow-x: auto; }
+.topnav-links { display: flex; gap: 22px; margin-left: 10px; margin-right: auto; flex-wrap: wrap; }
 
 .topnav-link {
   position: relative;
@@ -486,4 +495,214 @@ table.data tr.row-me td { background: var(--yellow); }
   .demo-grid { grid-template-columns: 1fr; }
   .balance-actions { align-items: flex-start; }
   .winner-name { font-size: 28px; }
+}
+
+
+/* == Messenger ======================================================== */
+
+.messenger {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: var(--white);
+  overflow: hidden;
+  min-height: 460px;
+}
+
+.thread-list { border-right: var(--border); background: var(--paper); display: flex; flex-direction: column; }
+
+.thread-list-head {
+  padding: 10px 14px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  border-bottom: var(--border);
+  background: var(--ink); color: var(--paper);
+}
+
+.thread-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  width: 100%; text-align: left;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--ink);
+  transition: background var(--fast);
+}
+
+.thread-item:hover { background: #fffbe6; }
+.thread-item.on { background: var(--yellow); }
+
+.thread-avatar {
+  width: 34px; height: 34px; flex-shrink: 0;
+  border: 2px solid var(--ink);
+  background: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px;
+}
+
+.thread-avatar-lg { width: 44px; height: 44px; font-size: 16px; }
+
+.thread-item-main { min-width: 0; flex: 1; }
+.thread-item-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.thread-who { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thread-count { font-size: 11px; font-weight: 700; border: 1.5px solid var(--ink); background: var(--white); padding: 0 5px; }
+
+.thread-snippet {
+  font-size: 12.5px; color: var(--muted); margin-top: 2px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.thread-you { font-weight: 700; color: var(--ink); }
+
+.thread-view { display: flex; flex-direction: column; min-width: 0; }
+
+.thread-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: var(--border);
+  background: var(--white);
+}
+
+.thread-head-who { font-weight: 700; font-size: 17px; letter-spacing: -0.02em; }
+.thread-head-sub { font-size: 13px; color: var(--muted); }
+.thread-head-sub:hover { color: var(--blue); }
+
+.bubbles {
+  flex: 1;
+  padding: 18px 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto;
+  max-height: 420px;
+  background: repeating-linear-gradient(45deg, transparent, transparent 14px, rgba(0,0,0,0.02) 14px, rgba(0,0,0,0.02) 15px);
+}
+
+.bubble-row { display: flex; }
+.bubble-row-mine { justify-content: flex-end; }
+
+.bubble {
+  max-width: 76%;
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  background: var(--white);
+  padding: 10px 13px;
+  animation: rise 260ms var(--ease) both;
+}
+
+.bubble-mine { background: var(--yellow); }
+
+.bubble-kind {
+  display: block;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted); margin-bottom: 4px;
+}
+
+.bubble-body { font-size: 14.5px; white-space: pre-wrap; line-height: 1.45; }
+
+.composer { display: flex; gap: 10px; padding: 12px 16px; border-top: var(--border); background: var(--paper); }
+.composer .field-input { flex: 1; }
+
+.thread-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+.thread-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; font-size: 13px; font-weight: 700;
+  border: var(--border); background: var(--white); box-shadow: 2px 2px 0 var(--ink);
+  transition: background var(--fast), transform var(--fast) var(--ease);
+}
+
+.thread-tab:hover { transform: translate(-1px, -1px); }
+.thread-tab.on { background: var(--yellow); }
+.thread-dot { width: 8px; height: 8px; border: 1.5px solid var(--ink); background: var(--green); display: inline-block; }
+
+.thread-tabs + .bubbles { max-height: 320px; border: var(--border); border-radius: var(--radius); margin-top: 12px; }
+.thread-tabs ~ .composer { border: var(--border); border-radius: var(--radius); margin-top: 10px; }
+
+/* == Profile ========================================================== */
+
+.profile {
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: var(--white);
+  overflow: hidden;
+}
+
+/* The one place more than two colours are allowed. It is an identity banner,
+   not an interface element, and it is what makes a ghost feel like somebody
+   rather than a row in a table. */
+.profile-banner {
+  height: 92px;
+  border-bottom: var(--border);
+  background: linear-gradient(
+    90deg,
+    var(--red) 0 12%, var(--yellow) 12% 26%, var(--blue) 26% 44%,
+    var(--green) 44% 58%, #f2f0e6 58% 68%, var(--yellow) 68% 82%,
+    var(--ink) 82% 90%, var(--blue) 90% 100%
+  );
+}
+
+.profile-head { display: flex; align-items: flex-end; gap: 16px; padding: 0 22px; margin-top: -34px; flex-wrap: wrap; }
+
+.profile-avatar {
+  width: 76px; height: 76px; flex-shrink: 0;
+  border: var(--border);
+  box-shadow: var(--shadow-sm);
+  background: var(--yellow);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 700; letter-spacing: -0.03em;
+}
+
+.profile-id { flex: 1; min-width: 180px; padding-bottom: 2px; }
+.profile-name { font-size: 32px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.05; }
+.profile-sub { font-size: 13.5px; color: var(--muted); margin-top: 2px; }
+
+.profile-stats { display: flex; gap: 10px; padding-bottom: 4px; }
+
+.profile-stats div {
+  border: var(--border); background: var(--white); box-shadow: 2px 2px 0 var(--ink);
+  padding: 6px 12px; text-align: center; min-width: 62px;
+}
+
+.profile-stats strong { display: block; font-size: 20px; line-height: 1.1; }
+.profile-stats span { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+
+.profile-actions { display: flex; gap: 10px; flex-wrap: wrap; padding: 16px 22px 20px; }
+.profile-edit { display: flex; gap: 10px; padding: 0 22px 20px; }
+.profile-edit .field-input { flex: 1; }
+
+.profile-grid { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+.profile-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+.panel { padding: 16px 18px; }
+
+.panel-title {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  padding-bottom: 8px; margin-bottom: 10px; border-bottom: var(--border);
+}
+
+.panel-text { font-size: 14px; line-height: 1.55; color: var(--muted); }
+.panel-text strong { color: var(--ink); }
+
+.mini-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1.5px solid var(--ink); }
+.mini-row:last-child { border-bottom: none; }
+.mini-title { font-size: 13.5px; font-weight: 600; }
+.mini-title:hover { color: var(--blue); }
+.mini-rank { font-family: var(--mono); font-size: 12px; font-weight: 700; }
+
+.entry-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1.5px solid var(--ink); }
+.entry-row:last-child { border-bottom: none; }
+.entry-rank { font-family: var(--mono); font-size: 15px; font-weight: 700; min-width: 34px; }
+.entry-main { flex: 1; min-width: 0; }
+.entry-title { font-weight: 600; }
+.entry-title:hover { color: var(--blue); }
+
+@media (max-width: 760px) {
+  .messenger { grid-template-columns: 1fr; min-height: 0; }
+  .thread-list { border-right: none; border-bottom: var(--border); max-height: 220px; overflow-y: auto; }
+  .profile-grid { grid-template-columns: 1fr; }
+  .profile-name { font-size: 26px; }
+  .profile-stats { width: 100%; }
+  .bubble { max-width: 88%; }
 }

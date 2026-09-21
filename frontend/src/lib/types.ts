@@ -71,14 +71,25 @@ export interface PracticeResult {
   scores: RankedRow;
 }
 
-export interface Message {
+export interface ThreadMessage {
   id: number;
-  kind: 'tap' | 'whisper' | 'answer';
+  kind: 'tap' | 'whisper' | 'answer' | 'reply';
+  /** company wrote it, or the ghost wrote it back. */
+  sender: 'company' | 'ghost';
   body: string;
   created_at: string;
+}
+
+export interface Thread {
   challenge_id: number;
+  ghost_id: string;
+  ghost_name: string;
   title: string;
   company: string;
+  messages: ThreadMessage[];
+  last_body: string;
+  last_sender: 'company' | 'ghost';
+  count: number;
 }
 
 export interface Question {

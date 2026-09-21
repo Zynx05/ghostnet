@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { api, ApiError } from '../../../lib/api';
 import { saveSession, useSession } from '../../../lib/auth';
 import { mergeSort, type Direction } from '../../../lib/mergeSort';
-import type { Challenge, Submission, RankedRow, RevealResponse, Question } from '../../../lib/types';
+import type { Challenge, Submission, RankedRow, RevealResponse, Question, Thread } from '../../../lib/types';
 import { Badge, EmptyState, Flash, type FlashMessage } from '../../../components/ui';
+import { Bubbles, Composer } from '../../../components/Thread';
 
 const COLUMNS: { key: keyof RankedRow; label: string; help: string }[] = [
   { key: 'relevance', label: 'Relevance', help: 'Does it answer what was asked' },
@@ -27,6 +28,8 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
   const [questions, setQuestions] = useState<Question[]>([]);
   const [reveal, setReveal] = useState<RevealResponse | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [openThread, setOpenThread] = useState<string | null>(null);
   const [justUnmasked, setJustUnmasked] = useState<string | null>(null);
   const [flash, setFlash] = useState<FlashMessage>(null);
   const [busy, setBusy] = useState(false);
@@ -71,6 +74,18 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
     if (isOwner && closed) api.unmasks(challengeId).then(setNames).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOwner, closed, challengeId]);
+
+  // Conversations this company already has going on this challenge.
+  useEffect(() => {
+    if (isOwner) api.challengeThreads(challengeId).then(setThreads).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOwner, challengeId]);
+
+  async function loadThreads(keep?: string) {
+    const rows = await api.challengeThreads(challengeId);
+    setThreads(rows);
+    if (keep) setOpenThread(keep);
+  }
 
   const fail = (e: unknown) => setFlash({ text: (e as Error).message, err: true });
 
@@ -128,14 +143,26 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
   }
 
   async function tap(ghostId: string) {
-    try { await api.message(challengeId, ghostId, 'tap'); setFlash({ text: 'Tapped. They will see it in their inbox and decide.' }); }
+    try {
+      await api.message(challengeId, ghostId, 'tap');
+      setFlash({ text: 'Tapped. They will see it in their inbox and decide.' });
+      loadThreads(ghostId);
+    } catch (e) { fail(e); }
+  }
+
+  async function sendInThread(ghostId: string, text: string) {
+    try { await api.message(challengeId, ghostId, 'reply', text); await loadThreads(ghostId); }
     catch (e) { fail(e); }
   }
 
   async function whisper(ghostId: string) {
     if (!whisperText.trim()) return;
-    try { await api.message(challengeId, ghostId, 'whisper', whisperText); setWhisperFor(null); setWhisperText(''); setFlash({ text: 'Whispered. Only they can read it.' }); }
-    catch (e) { fail(e); }
+    try {
+      await api.message(challengeId, ghostId, 'whisper', whisperText);
+      setWhisperFor(null); setWhisperText('');
+      setFlash({ text: 'Whispered. Only they can read it.' });
+      loadThreads(ghostId);
+    } catch (e) { fail(e); }
   }
 
   function sortBy(key: keyof RankedRow) {
@@ -301,6 +328,35 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
             {COLUMNS.slice(0, 4).map(c => <div key={c.key}><strong>{c.label}</strong> {c.help}</div>)}
             {isOwner && <div><strong>Tap</strong> asks to talk. <strong>Whisper</strong> sends one line of feedback. <strong>Rs 1,500</strong> shows a real name, once, after the challenge is closed.</div>}
           </div>
+        </section>
+      )}
+
+      {isOwner && threads.length > 0 && (
+        <section className="card">
+          <div className="card-title">Conversations ({threads.length})</div>
+          <div className="card-meta">Anyone you tapped or whispered to, and what they said back.</div>
+          <div className="thread-tabs">
+            {threads.map(t => (
+              <button
+                key={t.ghost_id}
+                className={t.ghost_id === (openThread ?? threads[0].ghost_id) ? 'thread-tab on' : 'thread-tab'}
+                onClick={() => setOpenThread(t.ghost_id)}
+              >
+                {t.ghost_name}
+                {t.last_sender === 'ghost' && <span className="thread-dot" title="They replied" />}
+              </button>
+            ))}
+          </div>
+          {(() => {
+            const t = threads.find(x => x.ghost_id === (openThread ?? threads[0].ghost_id));
+            if (!t) return null;
+            return (
+              <>
+                <Bubbles thread={t} mine="company" />
+                <Composer onSend={text => sendInThread(t.ghost_id, text)} placeholder={`Write to ${t.ghost_name}`} />
+              </>
+            );
+          })()}
         </section>
       )}
 

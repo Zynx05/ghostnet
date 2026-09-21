@@ -7,7 +7,7 @@
 import { readSession, type Session } from './auth';
 import type {
   Challenge, Submission, RankResponse, RankedRow, RevealResponse, UnmaskResponse,
-  PracticeResult, Message, Question, MyPage, LeaderRow,
+  PracticeResult, Thread, Question, MyPage, LeaderRow,
   ChainBlock, ScheduleResponse, MatchResponse,
 } from './types';
 
@@ -74,8 +74,11 @@ export const api = {
   practice: (id: number, content: string) => call<PracticeResult>(`/challenges/${id}/practice`, post({ content })),
 
   // Inbox and messages from companies
-  inbox: () => call<Message[]>('/inbox'),
-  message: (id: number, ghost_id: string, kind: 'tap' | 'whisper', body = '') =>
+  inbox: () => call<Thread[]>('/inbox'),
+  reply: (challengeId: number, body: string) =>
+    call<{ ok: true }>(`/inbox/${challengeId}/reply`, post({ body })),
+  challengeThreads: (id: number) => call<Thread[]>(`/challenges/${id}/threads`),
+  message: (id: number, ghost_id: string, kind: 'tap' | 'whisper' | 'reply', body = '') =>
     call<{ ok: true }>(`/challenges/${id}/messages`, post({ ghost_id, kind, body })),
 
   // Questions on a challenge

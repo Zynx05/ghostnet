@@ -104,6 +104,20 @@ CANDIDATES = [
 
 PASSWORD = "demo1234"
 
+# One conversation already going, so the Inbox is not an empty screen during
+# the demo. Challenge 1 belongs to Northwind Retail.
+CONVERSATION = [
+    (1, "pale-otter", "tap", "company",
+     "We would like to talk. Your cart summary was the most thorough one we read."),
+    (1, "pale-otter", "reply", "ghost",
+     "Happy to. What would the role actually involve day to day?"),
+    (1, "pale-otter", "reply", "company",
+     "Backend work on the checkout team. Four people, mostly Python. "
+     "Remote three days a week."),
+    (1, "calm-lynx", "whisper", "company",
+     "Ranked second. Right instinct on validation, but we needed working code."),
+]
+
 SUBMISSIONS = [
     (1, "quiet-falcon",
      "def validate_cart_total(items):\n"
@@ -206,6 +220,13 @@ def run():
         db.execute(
             "INSERT INTO submissions (challenge_id, ghost_id, content) VALUES (%s, %s, %s)",
             (challenge_id, ghost_id, content),
+        )
+
+    for challenge_id, ghost_id, kind, sender, body in CONVERSATION:
+        db.execute(
+            "INSERT INTO messages (challenge_id, ghost_id, kind, sender, body)"
+            " VALUES (%s, %s, %s, %s, %s)",
+            (challenge_id, ghost_id, kind, sender, body),
         )
 
     print("seeded", len(COMPANIES), "companies,", len(CANDIDATES), "candidates,",

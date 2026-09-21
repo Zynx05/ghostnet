@@ -97,6 +97,10 @@ class GhostRef(BaseModel):
     ghost_id: str
 
 
+class Reply(BaseModel):
+    body: str
+
+
 class NewQuestion(BaseModel):
     question: str
 
@@ -492,15 +496,84 @@ def practice_attempt(challenge_id: int, body: Content, x_token: str = Header(def
 
 # ── Inbox, taps, whispers ────────────────────────────────────────────────
 
+def thread_rows(where_sql, args):
+    """Messages grouped into one thread per challenge, oldest first inside each."""
+    rows = db.query(
+        "SELECT m.id, m.kind, m.sender, m.body, m.created_at, m.challenge_id,"
+        " m.ghost_id, c.title, c.company"
+        " FROM messages m JOIN challenges c ON c.id = m.challenge_id"
+        " WHERE " + where_sql + " ORDER BY m.id",
+        args,
+    )
+    threads = {}
+    for r in rows:
+        key = (r["challenge_id"], r["ghost_id"])
+        t = threads.setdefault(key, {
+            "challenge_id": r["challenge_id"],
+            "ghost_id": r["ghost_id"],
+            "title": r["title"],
+            "company": r["company"],
+            "messages": [],
+        })
+        t["messages"].append({
+            "id": r["id"], "kind": r["kind"], "sender": r["sender"],
+            "body": r["body"], "created_at": r["created_at"],
+        })
+
+    out = list(threads.values())
+    for t in out:
+        last = t["messages"][-1]
+        t["last_body"] = last["body"]
+        t["last_sender"] = last["sender"]
+        t["count"] = len(t["messages"])
+    # Newest conversation first, which is what a messages list should do.
+    out.sort(key=lambda t: t["messages"][-1]["id"], reverse=True)
+    return out
+
+
 @app.get("/inbox")
 def inbox(x_token: str = Header(default="")):
+    """One thread per challenge this ghost has been written to."""
     _, g = candidate_from(x_token)
-    return db.query(
-        "SELECT m.id, m.kind, m.body, m.created_at, m.challenge_id, c.title, c.company"
-        " FROM messages m JOIN challenges c ON c.id = m.challenge_id"
-        " WHERE m.ghost_id = %s ORDER BY m.id DESC",
-        (g["ghost_id"],),
+    threads = thread_rows("m.ghost_id = %s", (g["ghost_id"],))
+    for t in threads:
+        t["ghost_name"] = g["name"]
+    return threads
+
+
+@app.post("/inbox/{challenge_id}/reply")
+def reply(challenge_id: int, body: Reply, x_token: str = Header(default="")):
+    """
+    A candidate writes back. Only inside a thread a company already started,
+    so nobody can message a company out of the blue.
+    """
+    _, g = candidate_from(x_token)
+    challenge_or_404(challenge_id)
+    if not db.query(
+        "SELECT 1 FROM messages WHERE challenge_id = %s AND ghost_id = %s",
+        (challenge_id, g["ghost_id"]),
+    ):
+        raise HTTPException(400, "there is no conversation here yet")
+    if not body.body.strip():
+        raise HTTPException(400, "write something")
+
+    db.execute(
+        "INSERT INTO messages (ghost_id, challenge_id, kind, sender, body)"
+        " VALUES (%s, %s, %s, %s, %s)",
+        (g["ghost_id"], challenge_id, "reply", "ghost", body.body.strip()),
     )
+    return {"ok": True}
+
+
+@app.get("/challenges/{challenge_id}/threads")
+def challenge_threads(challenge_id: int, x_token: str = Header(default="")):
+    """Every conversation this company has going on its own challenge."""
+    owned_challenge(challenge_id, company_from(x_token))
+    threads = thread_rows("m.challenge_id = %s", (challenge_id,))
+    names = ghosts.names_for([t["ghost_id"] for t in threads])
+    for t in threads:
+        t["ghost_name"] = names.get(t["ghost_id"], t["ghost_id"])
+    return threads
 
 
 @app.post("/challenges/{challenge_id}/messages")
@@ -510,8 +583,8 @@ def send_message(challenge_id: int, body: NewMessage, x_token: str = Header(defa
     one line of feedback. Either way the ghost decides what happens next.
     """
     owned_challenge(challenge_id, company_from(x_token))
-    if body.kind not in ("tap", "whisper"):
-        raise HTTPException(400, "kind must be tap or whisper")
+    if body.kind not in ("tap", "whisper", "reply"):
+        raise HTTPException(400, "kind must be tap, whisper or reply")
     if not db.query("SELECT 1 FROM submissions WHERE challenge_id = %s AND ghost_id = %s",
                     (challenge_id, body.ghost_id)):
         raise HTTPException(400, "that ghost did not enter this challenge")
@@ -520,10 +593,11 @@ def send_message(challenge_id: int, body: NewMessage, x_token: str = Header(defa
         "We would like to talk. Reply here if you want to unmask." if body.kind == "tap" else ""
     )
     if not text:
-        raise HTTPException(400, "a whisper needs some words")
+        raise HTTPException(400, "a message needs some words")
     db.execute(
-        "INSERT INTO messages (ghost_id, challenge_id, kind, body) VALUES (%s, %s, %s, %s)",
-        (body.ghost_id, challenge_id, body.kind, text),
+        "INSERT INTO messages (ghost_id, challenge_id, kind, sender, body)"
+        " VALUES (%s, %s, %s, %s, %s)",
+        (body.ghost_id, challenge_id, body.kind, "company", text),
     )
     return {"ok": True}
 

@@ -8,12 +8,13 @@ import { RequireRole } from '../../components/RequireRole';
 import { Badge, EmptyState, Flash, Skeleton, type FlashMessage } from '../../components/ui';
 
 export default function MePage() {
-  return <RequireRole role="candidate"><Me /></RequireRole>;
+  return <RequireRole role="candidate"><Profile /></RequireRole>;
 }
 
-function Me() {
+function Profile() {
   const [me, setMe] = useState<MyPage | null>(null);
   const [name, setName] = useState('');
+  const [editing, setEditing] = useState(false);
   const [flash, setFlash] = useState<FlashMessage>(null);
 
   async function load() {
@@ -27,110 +28,152 @@ function Me() {
   async function saveName() {
     try {
       await api.setName(name);
-      setFlash({ text: name.trim() ? 'Saved. A company only sees this if they pay to unmask you.' : 'Cleared. You stay masked even if you win.' });
+      setEditing(false);
+      setFlash({
+        text: name.trim()
+          ? 'Saved. A company only sees this if they pay to unmask you.'
+          : 'Cleared. You stay masked even if you win.',
+      });
       load();
     } catch (e) {
       setFlash({ text: (e as Error).message, err: true });
     }
   }
 
-  if (!me) return <div className="page"><Flash message={flash} /><div className="card"><Skeleton rows={4} /></div></div>;
+  if (!me) return <div className="page"><Flash message={flash} /><div className="card"><Skeleton rows={5} /></div></div>;
 
   const wins = me.proofs.length;
+  const ranked = me.entries.filter(e => e.rank).length;
+  const initials = me.ghost.name.split(/\s+/).slice(0, 2).map(w => w[0]).join('');
 
   return (
     <div className="page">
-      <section className="credential">
-        <div className="credential-head">
-          <div>
-            <span className="algo-tag">Your ghost</span>
-            <div className="credential-id">{me.ghost.name}</div>
+      <section className="profile">
+        <div className="profile-banner" aria-hidden="true" />
+        <div className="profile-head">
+          <div className="profile-avatar">{initials}</div>
+          <div className="profile-id">
+            <h1 className="profile-name">{me.ghost.name}</h1>
+            <div className="profile-sub">
+              {me.ghost.real_name
+                ? <>Real name on file · shown only if a company pays</>
+                : <>No real name · you stay masked even if you win</>}
+            </div>
           </div>
-          <div className="credential-count">
-            <div className="credential-count-n">{wins}</div>
-            <div className="algo-tag">verified {wins === 1 ? 'win' : 'wins'}</div>
+          <div className="profile-stats">
+            <div><strong>{wins}</strong><span>wins</span></div>
+            <div><strong>{me.entries.length}</strong><span>entries</span></div>
+            <div><strong>{ranked}</strong><span>ranked</span></div>
           </div>
         </div>
-        {me.check_code && (
-          <div className="credential-foot">
-            <span className="algo-tag">Check code · give this to an employer</span>
-            <div className="hash">{me.check_code}</div>
+        <div className="profile-actions">
+          <button className="btn btn-accent" onClick={() => setEditing(!editing)}>
+            {editing ? 'Cancel' : me.ghost.real_name ? 'Edit real name' : 'Add real name'}
+          </button>
+          <Link href="/practice" className="btn">Practice</Link>
+          <Link href="/chain" className="btn btn-ghost">Proof chain</Link>
+        </div>
+        {editing && (
+          <div className="profile-edit">
+            <input
+              className="field-input"
+              value={name}
+              placeholder="Leave blank to stay masked"
+              onChange={e => setName(e.target.value)}
+              autoFocus
+            />
+            <button className="btn btn-accent" onClick={saveName}>Save</button>
           </div>
         )}
       </section>
 
       <Flash message={flash} />
 
-      <section className="card">
-        <div className="card-title">Your real name</div>
-        <div className="card-meta">Optional. A company pays Rs 1,500 to see it, and only after you have entered and they have closed the challenge. Leave it blank to stay masked no matter what.</div>
-        <div className="qa-ask" style={{ marginTop: 10 }}>
-          <input className="field-input" value={name} placeholder="Leave blank to stay masked" onChange={e => setName(e.target.value)} />
-          <button className="btn btn-sm btn-accent" onClick={saveName}>Save</button>
-        </div>
-      </section>
+      <div className="profile-grid">
+        <aside className="profile-col">
+          <section className="card panel">
+            <div className="panel-title">About</div>
+            <p className="panel-text">
+              You are <strong>{me.ghost.name}</strong>. That name is the only thing a
+              company sees while it is judging your work. Your real name sits behind
+              it and costs Rs 1,500 to reveal, after a challenge closes.
+            </p>
+          </section>
 
-      {me.proofs.length > 0 && (
-        <section className="card">
-          <div className="card-title">Skill Proof</div>
-          <div className="card-meta">Each win is sealed to the one before it. <Link href="/chain" className="link">See the whole chain</Link>.</div>
-          <div className="chain">
-            {me.proofs.map((p, i) => (
-              <div key={p.challenge_id} className="chain-item">
-                <div className="chain-rail"><div className="chain-dot">✓</div>{i < me.proofs.length - 1 && <div className="chain-line" />}</div>
-                <div className="chain-body">
-                  <div className="chain-title">{p.title}</div>
-                  <div className="card-meta">{p.company}</div>
-                  <div className="hash" style={{ marginTop: 4 }}>{p.seal.slice(0, 32)}…</div>
+          {me.check_code && (
+            <section className="card panel">
+              <div className="panel-title">Check code</div>
+              <p className="panel-text">Give this to an employer and they can verify any win.</p>
+              <div className="hash" style={{ marginTop: 8 }}>{me.check_code}</div>
+            </section>
+          )}
+
+          <section className="card panel">
+            <div className="panel-title">Practice ({me.practice.length})</div>
+            {me.practice.length === 0 ? (
+              <p className="panel-text">Nothing yet. <Link href="/practice" className="link">Warm up</Link>.</p>
+            ) : (
+              me.practice.slice(0, 5).map((p, i) => (
+                <div key={i} className="mini-row">
+                  <Link href={`/practice/${p.challenge_id}`} className="mini-title">
+                    {p.title.replace(/^Warm up: /, '')}
+                  </Link>
+                  <span className="mini-rank">#{p.would_rank}/{p.out_of}</span>
                 </div>
+              ))
+            )}
+          </section>
+        </aside>
+
+        <div className="profile-col">
+          <section className="card panel">
+            <div className="panel-title">Skill Proof</div>
+            {me.proofs.length === 0 ? (
+              <p className="panel-text">
+                No verified wins yet. Win a challenge and it gets sealed here, linked
+                to the one before it.
+              </p>
+            ) : (
+              <div className="chain">
+                {me.proofs.map((p, i) => (
+                  <div key={p.challenge_id} className="chain-item">
+                    <div className="chain-rail">
+                      <div className="chain-dot">✓</div>
+                      {i < me.proofs.length - 1 && <div className="chain-line" />}
+                    </div>
+                    <div className="chain-body">
+                      <div className="chain-title">{p.title}</div>
+                      <div className="card-meta">{p.company}</div>
+                      <div className="hash" style={{ marginTop: 4 }}>{p.seal.slice(0, 32)}…</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+            )}
+          </section>
 
-      <section className="card">
-        <div className="card-title">Your entries ({me.entries.length})</div>
-        {me.entries.length === 0 ? (
-          <EmptyState title="No entries yet" description="Open a challenge and enter it. Or warm up under Practice first." />
-        ) : (
-          <div className="table-wrap">
-            <table className="data">
-              <thead><tr><th>Challenge</th><th>Company</th><th className="num">Rank</th><th></th></tr></thead>
-              <tbody>
-                {me.entries.map(e => (
-                  <tr key={e.challenge_id}>
-                    <td><Link href={`/challenge/${e.challenge_id}`} className="link">{e.title}</Link></td>
-                    <td>{e.company}</td>
-                    <td className="num">{e.rank ? `#${e.rank}` : '—'}</td>
-                    <td>{e.rank === 1 && e.revealed ? <Badge tone="good">Won</Badge> : e.revealed ? <Badge>Closed</Badge> : e.rank ? <Badge tone="accent">Ranked</Badge> : <Badge>Waiting</Badge>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {me.practice.length > 0 && (
-        <section className="card">
-          <div className="card-title">Practice ({me.practice.length})</div>
-          <div className="table-wrap">
-            <table className="data">
-              <thead><tr><th>Challenge</th><th className="num">Would have ranked</th><th className="num">Score</th></tr></thead>
-              <tbody>
-                {me.practice.map((p, i) => (
-                  <tr key={i}>
-                    <td><Link href={`/practice/${p.challenge_id}`} className="link">{p.title.replace(/^Warm up: /, '')}</Link></td>
-                    <td className="num">#{p.would_rank} of {p.out_of}</td>
-                    <td className="num">{p.final_score.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+          <section className="card panel">
+            <div className="panel-title">Entries ({me.entries.length})</div>
+            {me.entries.length === 0 ? (
+              <EmptyState title="No entries yet" description="Open a challenge and enter it." />
+            ) : (
+              me.entries.map(e => (
+                <div key={e.challenge_id} className="entry-row">
+                  <div className="entry-rank">{e.rank ? `#${e.rank}` : '—'}</div>
+                  <div className="entry-main">
+                    <Link href={`/challenge/${e.challenge_id}`} className="entry-title">{e.title}</Link>
+                    <div className="card-meta">{e.company}</div>
+                  </div>
+                  {e.rank === 1 && e.revealed ? <Badge tone="good">Won</Badge>
+                    : e.revealed ? <Badge>Closed</Badge>
+                    : e.rank ? <Badge tone="accent">Ranked</Badge>
+                    : <Badge>Waiting</Badge>}
+                </div>
+              ))
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

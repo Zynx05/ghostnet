@@ -36,7 +36,8 @@ submissions  anonymous work, one per ghost per challenge
 results      the scores produced by one ranking run
 practice     where a ghost would have ranked on a closed challenge. Never
              touches results
-messages     the inbox. Taps and whispers from companies, answers to questions
+messages     the inbox. Taps, whispers and answers from a company, and the
+             replies a candidate sends back. One thread per challenge
 questions    asked on a challenge, answered by the company, visible to all
 """
 
@@ -136,6 +137,8 @@ CREATE TABLE IF NOT EXISTS messages (
     ghost_id      TEXT    NOT NULL REFERENCES ghosts(ghost_id) ON DELETE CASCADE,
     challenge_id  INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
     kind          TEXT    NOT NULL,
+    -- Who wrote it. Everything a company sends is company, a reply is ghost.
+    sender        TEXT    NOT NULL DEFAULT 'company',
     body          TEXT    NOT NULL,
     created_at    {TS}
 );
