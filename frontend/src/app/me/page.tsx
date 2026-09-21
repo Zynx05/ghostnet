@@ -3,45 +3,38 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '../../lib/api';
-import { ensureGhost, forgetGhost } from '../../lib/ghost';
 import type { MyPage } from '../../lib/types';
+import { RequireRole } from '../../components/RequireRole';
 import { Badge, EmptyState, Flash, Skeleton, type FlashMessage } from '../../components/ui';
 
 export default function MePage() {
+  return <RequireRole role="candidate"><Me /></RequireRole>;
+}
+
+function Me() {
   const [me, setMe] = useState<MyPage | null>(null);
   const [name, setName] = useState('');
   const [flash, setFlash] = useState<FlashMessage>(null);
 
   async function load() {
-    await ensureGhost();
     const data = await api.me();
     setMe(data);
     setName(data.ghost.real_name);
   }
 
-  useEffect(() => {
-    load().catch(e => setFlash({ text: e.message, err: true }));
-  }, []);
+  useEffect(() => { load().catch(e => setFlash({ text: e.message, err: true })); }, []);
 
   async function saveName() {
     try {
       await api.setName(name);
-      setFlash({ text: name.trim() ? 'Saved. Shown only if you win.' : 'Cleared. You will stay masked even if you win.' });
+      setFlash({ text: name.trim() ? 'Saved. A company only sees this if they pay to unmask you.' : 'Cleared. You stay masked even if you win.' });
       load();
     } catch (e) {
       setFlash({ text: (e as Error).message, err: true });
     }
   }
 
-  function startOver() {
-    if (!confirm('This forgets your ghost in this browser. Your entries stay, but you will not be able to see them as you. Continue?')) return;
-    forgetGhost();
-    location.reload();
-  }
-
-  if (!me) {
-    return <div className="page"><Flash message={flash} /><div className="card"><Skeleton rows={4} /></div></div>;
-  }
+  if (!me) return <div className="page"><Flash message={flash} /><div className="card"><Skeleton rows={4} /></div></div>;
 
   const wins = me.proofs.length;
 
@@ -70,13 +63,9 @@ export default function MePage() {
 
       <section className="card">
         <div className="card-title">Your real name</div>
-        <div className="card-meta">
-          Optional. Nobody sees it unless you win, and you can leave it blank to
-          stay masked even then.
-        </div>
+        <div className="card-meta">Optional. A company pays Rs 1,500 to see it, and only after you have entered and they have closed the challenge. Leave it blank to stay masked no matter what.</div>
         <div className="qa-ask" style={{ marginTop: 10 }}>
-          <input className="field-input" value={name} placeholder="Leave blank to stay masked"
-            onChange={e => setName(e.target.value)} />
+          <input className="field-input" value={name} placeholder="Leave blank to stay masked" onChange={e => setName(e.target.value)} />
           <button className="btn btn-sm btn-accent" onClick={saveName}>Save</button>
         </div>
       </section>
@@ -88,10 +77,7 @@ export default function MePage() {
           <div className="chain">
             {me.proofs.map((p, i) => (
               <div key={p.challenge_id} className="chain-item">
-                <div className="chain-rail">
-                  <div className="chain-dot">✓</div>
-                  {i < me.proofs.length - 1 && <div className="chain-line" />}
-                </div>
+                <div className="chain-rail"><div className="chain-dot">✓</div>{i < me.proofs.length - 1 && <div className="chain-line" />}</div>
                 <div className="chain-body">
                   <div className="chain-title">{p.title}</div>
                   <div className="card-meta">{p.company}</div>
@@ -117,12 +103,7 @@ export default function MePage() {
                     <td><Link href={`/challenge/${e.challenge_id}`} className="link">{e.title}</Link></td>
                     <td>{e.company}</td>
                     <td className="num">{e.rank ? `#${e.rank}` : '—'}</td>
-                    <td>
-                      {e.rank === 1 && e.revealed ? <Badge tone="good">Won</Badge>
-                        : e.revealed ? <Badge>Closed</Badge>
-                        : e.rank ? <Badge tone="accent">Ranked</Badge>
-                        : <Badge>Waiting</Badge>}
-                    </td>
+                    <td>{e.rank === 1 && e.revealed ? <Badge tone="good">Won</Badge> : e.revealed ? <Badge>Closed</Badge> : e.rank ? <Badge tone="accent">Ranked</Badge> : <Badge>Waiting</Badge>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -150,10 +131,6 @@ export default function MePage() {
           </div>
         </section>
       )}
-
-      <div className="card-meta" style={{ textAlign: 'center', padding: 8 }}>
-        This ghost lives in this browser. <button className="link-btn" onClick={startOver}>Start as a new ghost</button>
-      </div>
     </div>
   );
 }

@@ -6,10 +6,10 @@ input, calls one module, and returns JSON. No logic lives here.
 Run it with:  uvicorn main:app --reload
 
 Who is who
-    A person is a ghost. The browser sends X-Ghost-Token and that is the
-    whole login. There are no passwords and no email addresses.
-    A company is whoever is looking at a challenge page. This is an MVP, so
-    the company side has no login either.
+    The browser sends X-Token. That maps to a user, who is either a candidate
+    with a ghost, or a company with a balance. A candidate enters challenges
+    and asks questions. A company posts challenges, ranks them, closes them,
+    and pays to see a real name.
 """
 
 import os
@@ -19,6 +19,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import auth
 import db
 import ghosts
 from algorithms import ranker, merkle, gale_shapley, scheduling
@@ -35,7 +36,7 @@ async def lifespan(app: FastAPI):
     db.pool.close()
 
 
-app = FastAPI(title="GhostNet API", version="2.0", lifespan=lifespan)
+app = FastAPI(title="GhostNet API", version="3.0", lifespan=lifespan)
 
 # A browser blocks a page on one address from calling an API on another unless
 # the API says that address is allowed. Locally that is port 3000. Once the
@@ -58,9 +59,20 @@ app.add_middleware(
 
 # ── Request shapes ───────────────────────────────────────────────────────
 
+class Signup(BaseModel):
+    email: str
+    password: str
+    role: str
+    company_name: str = ""
+
+
+class Login(BaseModel):
+    email: str
+    password: str
+
+
 class NewChallenge(BaseModel):
     title: str
-    company: str
     statement: str
     reward: str = ""
     start_day: int = 0
@@ -81,6 +93,10 @@ class NewMessage(BaseModel):
     body: str = ""
 
 
+class GhostRef(BaseModel):
+    ghost_id: str
+
+
 class NewQuestion(BaseModel):
     question: str
 
@@ -94,16 +110,39 @@ class MatchInput(BaseModel):
     companies: dict
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────
+# ── Who is asking ────────────────────────────────────────────────────────
 
-def me(token):
-    """The ghost behind this request, or a 401 if the token is missing or wrong."""
-    if not token:
-        raise HTTPException(401, "no ghost token")
-    ghost = ghosts.by_token(token)
-    if not ghost:
-        raise HTTPException(401, "unknown ghost")
-    return ghost
+def user_from(token):
+    user = auth.by_token(token)
+    if not user:
+        raise HTTPException(401, "please log in")
+    return user
+
+
+def candidate_from(token):
+    """The ghost behind this request. 401 if not logged in, 403 if a company."""
+    user = user_from(token)
+    if user["role"] != "candidate":
+        raise HTTPException(403, "only candidates can do that")
+    g = ghosts.for_user(user["id"])
+    if not g:
+        raise HTTPException(500, "candidate without a ghost")
+    return user, g
+
+
+def company_from(token):
+    user = user_from(token)
+    if user["role"] != "company":
+        raise HTTPException(403, "only companies can do that")
+    return user
+
+
+def owned_challenge(challenge_id, company):
+    """The challenge, but only if this company posted it."""
+    c = challenge_or_404(challenge_id)
+    if c["company_id"] != company["id"]:
+        raise HTTPException(403, "that is another company's challenge")
+    return c
 
 
 def challenge_or_404(challenge_id):
@@ -129,18 +168,42 @@ def health():
     return {"status": "ok", "service": "ghostnet"}
 
 
-# ── Ghosts ───────────────────────────────────────────────────────────────
+# ── Accounts ─────────────────────────────────────────────────────────────
 
-@app.post("/ghosts")
-def new_ghost():
-    """A browser calls this once and keeps the token."""
-    return ghosts.create()
+@app.post("/auth/signup")
+def signup(body: Signup):
+    result = auth.signup(body.email, body.password, body.role, body.company_name)
+    if isinstance(result, str):
+        raise HTTPException(400, result)
+    return result
 
+
+@app.post("/auth/login")
+def login(body: Login):
+    result = auth.login(body.email, body.password)
+    if isinstance(result, str):
+        raise HTTPException(400, result)
+    return result
+
+
+@app.get("/auth/session")
+def session(x_token: str = Header(default="")):
+    """The browser calls this on load to refresh the name and the balance."""
+    return auth.session_for(user_from(x_token))
+
+
+@app.post("/auth/logout")
+def logout(x_token: str = Header(default="")):
+    auth.logout(user_from(x_token)["id"])
+    return {"ok": True}
+
+
+# ── Candidate: my ghost ──────────────────────────────────────────────────
 
 @app.get("/me")
-def my_page(x_ghost_token: str = Header(default="")):
+def my_page(x_token: str = Header(default="")):
     """Everything on the My Ghost page in one call."""
-    g = me(x_ghost_token)
+    _, g = candidate_from(x_token)
 
     entries = with_names(db.query(
         "SELECT s.challenge_id, c.title, c.company, c.revealed, s.ghost_id,"
@@ -167,18 +230,15 @@ def my_page(x_ghost_token: str = Header(default="")):
         "ghost": g,
         "entries": entries,
         "practice": practice,
-        "proofs": [
-            {**w, "seal": block["hash"]}
-            for w, block in zip(wins, merkle.chain(leaves))
-        ],
+        "proofs": [{**w, "seal": b["hash"]} for w, b in zip(wins, merkle.chain(leaves))],
         "check_code": merkle.root(leaves) if leaves else "",
     }
 
 
 @app.patch("/me")
-def set_name(body: NameUpdate, x_ghost_token: str = Header(default="")):
-    """The real name is optional and is only ever shown if the ghost wins."""
-    g = me(x_ghost_token)
+def set_name(body: NameUpdate, x_token: str = Header(default="")):
+    """The real name is optional and is only ever shown if a company pays."""
+    _, g = candidate_from(x_token)
     db.execute(
         "UPDATE ghosts SET real_name = %s WHERE ghost_id = %s",
         (body.real_name.strip(), g["ghost_id"]),
@@ -190,13 +250,12 @@ def set_name(body: NameUpdate, x_ghost_token: str = Header(default="")):
 
 @app.get("/challenges")
 def list_challenges():
-    rows = db.query(
+    return db.query(
         "SELECT c.*, COUNT(s.id) AS entries"
         " FROM challenges c LEFT JOIN submissions s ON s.challenge_id = c.id"
         " WHERE NOT c.practice"
         " GROUP BY c.id ORDER BY c.id DESC"
     )
-    return rows
 
 
 @app.get("/challenges/{challenge_id}")
@@ -205,47 +264,68 @@ def get_challenge(challenge_id: int):
 
 
 @app.post("/challenges")
-def create_challenge(body: NewChallenge):
+def create_challenge(body: NewChallenge, x_token: str = Header(default="")):
+    company = company_from(x_token)
     if not body.title.strip() or not body.statement.strip():
         raise HTTPException(400, "a title and a problem are both needed")
     new_id = db.execute(
-        "INSERT INTO challenges (title, company, statement, reward, start_day, end_day)"
-        " VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-        (body.title, body.company, body.statement, body.reward,
-         body.start_day, body.end_day),
+        "INSERT INTO challenges (company_id, title, company, statement, reward, start_day, end_day)"
+        " VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (company["id"], body.title, company["company_name"], body.statement,
+         body.reward, body.start_day, body.end_day),
     )
     return {"id": new_id}
 
 
+@app.get("/company/challenges")
+def company_challenges(x_token: str = Header(default="")):
+    company = company_from(x_token)
+    return db.query(
+        "SELECT c.*, COUNT(s.id) AS entries"
+        " FROM challenges c LEFT JOIN submissions s ON s.challenge_id = c.id"
+        " WHERE c.company_id = %s"
+        " GROUP BY c.id ORDER BY c.id DESC",
+        (company["id"],),
+    )
+
+
+@app.post("/company/topup")
+def topup(x_token: str = Header(default="")):
+    """
+    Demo money. A real launch puts JazzCash or Easypaisa here. For now the
+    button adds ten thousand rupees so the unmask flow can be shown working.
+    """
+    company = company_from(x_token)
+    auth.topup(company["id"], auth.DEMO_TOPUP_PKR)
+    return auth.session_for(auth.by_token(x_token))
+
+
+# ── Entries ──────────────────────────────────────────────────────────────
+
 @app.get("/challenges/{challenge_id}/submissions")
 def list_submissions(challenge_id: int):
     """
-    Note the column list. Nothing here joins to the ghosts table for a real
-    name, so anonymity is not a rule someone has to remember, it is simply
-    absent from the query.
+    Note the column list. Nothing here joins to a real name, so anonymity is
+    not a rule someone has to remember, it is simply absent from the query.
     """
     return with_names(db.query(
-        "SELECT id, ghost_id, content FROM submissions WHERE challenge_id = %s"
-        " ORDER BY id",
+        "SELECT id, ghost_id, content FROM submissions WHERE challenge_id = %s ORDER BY id",
         (challenge_id,),
     ))
 
 
 @app.post("/challenges/{challenge_id}/submissions")
-def add_submission(challenge_id: int, body: Content,
-                   x_ghost_token: str = Header(default="")):
-    g = me(x_ghost_token)
+def add_submission(challenge_id: int, body: Content, x_token: str = Header(default="")):
+    _, g = candidate_from(x_token)
     c = challenge_or_404(challenge_id)
     if c["revealed"]:
         raise HTTPException(400, "this challenge is closed. Try it under Practice")
+    if c["practice"]:
+        raise HTTPException(400, "warm ups are for practice only")
     if not body.content.strip():
         raise HTTPException(400, "the entry is empty")
-
-    already = db.query(
-        "SELECT 1 FROM submissions WHERE challenge_id = %s AND ghost_id = %s",
-        (challenge_id, g["ghost_id"]),
-    )
-    if already:
+    if db.query("SELECT 1 FROM submissions WHERE challenge_id = %s AND ghost_id = %s",
+                (challenge_id, g["ghost_id"])):
         raise HTTPException(400, "you already entered this one")
 
     db.execute(
@@ -255,21 +335,19 @@ def add_submission(challenge_id: int, body: Content,
     return {"ghost_id": g["ghost_id"], "ghost_name": g["name"]}
 
 
-# ── Ranking and reveal ───────────────────────────────────────────────────
+# ── Ranking, closing, unmasking ──────────────────────────────────────────
 
 @app.post("/challenges/{challenge_id}/rank")
-def rank(challenge_id: int):
+def rank(challenge_id: int, x_token: str = Header(default="")):
     """The demo button. Every scoring algorithm runs inside this one call."""
-    challenge = challenge_or_404(challenge_id)
+    c = owned_challenge(challenge_id, company_from(x_token))
     subs = db.query(
-        "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s",
-        (challenge_id,),
+        "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s", (challenge_id,)
     )
     if not subs:
         raise HTTPException(400, "nothing has been entered yet")
 
-    rows = ranker.score_all(challenge["statement"], subs)
-
+    rows = ranker.score_all(c["statement"], subs)
     db.execute("DELETE FROM results WHERE challenge_id = %s", (challenge_id,))
     for r in rows:
         db.execute(
@@ -286,38 +364,88 @@ def rank(challenge_id: int):
 @app.get("/challenges/{challenge_id}/results")
 def get_results(challenge_id: int):
     return with_names(db.query(
-        "SELECT * FROM results WHERE challenge_id = %s ORDER BY rank",
-        (challenge_id,),
+        "SELECT * FROM results WHERE challenge_id = %s ORDER BY rank", (challenge_id,)
     ))
 
 
 @app.post("/challenges/{challenge_id}/reveal")
-def reveal(challenge_id: int):
+def reveal(challenge_id: int, x_token: str = Header(default="")):
     """
-    The winner is unmasked, if they chose to be, and the win is sealed.
-    The Merkle proof returned here lets anyone check the win on their own.
+    Close the challenge and name the winning ghost. Free. The real name
+    behind the ghost is a separate, paid step, see unmask.
     """
+    owned_challenge(challenge_id, company_from(x_token))
     results = get_results(challenge_id)
     if not results:
         raise HTTPException(400, "run the ranking first")
 
-    winner = results[0]
-    # The one query in the whole codebase that reads a real name.
-    row = db.query(
-        "SELECT real_name FROM ghosts WHERE ghost_id = %s", (winner["ghost_id"],)
-    )
-    real_name = row[0]["real_name"] if row else ""
     db.execute("UPDATE challenges SET revealed = TRUE WHERE id = %s", (challenge_id,))
-
     leaves = [r["ghost_id"] + ":" + str(r["final_score"]) for r in results]
     return {
-        "winner": winner,
-        "real_name": real_name,
-        "masked": real_name == "",
+        "winner": results[0],
         "merkle_root": merkle.root(leaves),
         "leaf": leaves[0],
         "proof": merkle.proof_for(leaves, 0),
         "leaf_count": len(leaves),
+    }
+
+
+@app.get("/challenges/{challenge_id}/unmasks")
+def my_unmasks(challenge_id: int, x_token: str = Header(default="")):
+    """Real names this company has already paid for on this challenge."""
+    company = company_from(x_token)
+    rows = db.query(
+        "SELECT u.ghost_id, g.real_name FROM unmasks u"
+        " JOIN ghosts g ON g.ghost_id = u.ghost_id"
+        " WHERE u.challenge_id = %s AND u.company_id = %s",
+        (challenge_id, company["id"]),
+    )
+    return {r["ghost_id"]: r["real_name"] for r in rows}
+
+
+@app.post("/challenges/{challenge_id}/unmask")
+def unmask(challenge_id: int, body: GhostRef, x_token: str = Header(default="")):
+    """
+    Pay to see who a ghost really is. Rs 1,500, once per candidate per
+    challenge. Not charged if the candidate never gave a name, because there
+    is nothing to sell. This is the one query in the codebase that reads a
+    real name for a company.
+    """
+    company = company_from(x_token)
+    c = owned_challenge(challenge_id, company)
+    if not c["revealed"]:
+        raise HTTPException(400, "close the challenge first")
+    if not db.query("SELECT 1 FROM submissions WHERE challenge_id = %s AND ghost_id = %s",
+                    (challenge_id, body.ghost_id)):
+        raise HTTPException(400, "that ghost did not enter this challenge")
+
+    row = db.query("SELECT real_name FROM ghosts WHERE ghost_id = %s", (body.ghost_id,))
+    real_name = row[0]["real_name"] if row else ""
+    if not real_name:
+        return {"ghost_id": body.ghost_id, "masked": True, "real_name": "", "charged_pkr": 0}
+
+    already = db.query(
+        "SELECT 1 FROM unmasks WHERE challenge_id = %s AND company_id = %s AND ghost_id = %s",
+        (challenge_id, company["id"], body.ghost_id),
+    )
+    charged = 0
+    if not already:
+        if not auth.charge(company["id"], auth.UNMASK_PRICE_PKR):
+            raise HTTPException(402, "not enough balance. Add funds first")
+        db.execute(
+            "INSERT INTO unmasks (challenge_id, company_id, ghost_id, charged_pkr)"
+            " VALUES (%s, %s, %s, %s)",
+            (challenge_id, company["id"], body.ghost_id, auth.UNMASK_PRICE_PKR),
+        )
+        charged = auth.UNMASK_PRICE_PKR
+
+    fresh = auth.by_token(x_token)
+    return {
+        "ghost_id": body.ghost_id,
+        "masked": False,
+        "real_name": real_name,
+        "charged_pkr": charged,
+        "balance_pkr": fresh["balance_pkr"],
     }
 
 
@@ -335,13 +463,12 @@ def practice_list():
 
 
 @app.post("/challenges/{challenge_id}/practice")
-def practice_attempt(challenge_id: int, body: Content,
-                     x_ghost_token: str = Header(default="")):
+def practice_attempt(challenge_id: int, body: Content, x_token: str = Header(default="")):
     """
     Score this entry against the real ones and say where it would have landed.
     Nothing is written to results, so the real ranking is untouched.
     """
-    g = me(x_ghost_token)
+    _, g = candidate_from(x_token)
     c = challenge_or_404(challenge_id)
     if not (c["revealed"] or c["practice"]):
         raise HTTPException(400, "this one is still open. Enter it for real")
@@ -349,8 +476,7 @@ def practice_attempt(challenge_id: int, body: Content,
         raise HTTPException(400, "the entry is empty")
 
     subs = db.query(
-        "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s",
-        (challenge_id,),
+        "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s", (challenge_id,)
     )
     subs.append({"ghost_id": "__you__", "content": body.content})
     rows = ranker.score_all(c["statement"], subs)
@@ -367,11 +493,10 @@ def practice_attempt(challenge_id: int, body: Content,
 # ── Inbox, taps, whispers ────────────────────────────────────────────────
 
 @app.get("/inbox")
-def inbox(x_ghost_token: str = Header(default="")):
-    g = me(x_ghost_token)
+def inbox(x_token: str = Header(default="")):
+    _, g = candidate_from(x_token)
     return db.query(
-        "SELECT m.id, m.kind, m.body, m.created_at, m.challenge_id,"
-        " c.title, c.company"
+        "SELECT m.id, m.kind, m.body, m.created_at, m.challenge_id, c.title, c.company"
         " FROM messages m JOIN challenges c ON c.id = m.challenge_id"
         " WHERE m.ghost_id = %s ORDER BY m.id DESC",
         (g["ghost_id"],),
@@ -379,28 +504,23 @@ def inbox(x_ghost_token: str = Header(default="")):
 
 
 @app.post("/challenges/{challenge_id}/messages")
-def send_message(challenge_id: int, body: NewMessage):
+def send_message(challenge_id: int, body: NewMessage, x_token: str = Header(default="")):
     """
     A company reaches a ghost. A tap says we would like to talk. A whisper is
     one line of feedback. Either way the ghost decides what happens next.
     """
-    challenge_or_404(challenge_id)
+    owned_challenge(challenge_id, company_from(x_token))
     if body.kind not in ("tap", "whisper"):
         raise HTTPException(400, "kind must be tap or whisper")
-    entered = db.query(
-        "SELECT 1 FROM submissions WHERE challenge_id = %s AND ghost_id = %s",
-        (challenge_id, body.ghost_id),
-    )
-    if not entered:
+    if not db.query("SELECT 1 FROM submissions WHERE challenge_id = %s AND ghost_id = %s",
+                    (challenge_id, body.ghost_id)):
         raise HTTPException(400, "that ghost did not enter this challenge")
 
     text = body.body.strip() or (
-        "We would like to talk. Reply here if you want to unmask."
-        if body.kind == "tap" else ""
+        "We would like to talk. Reply here if you want to unmask." if body.kind == "tap" else ""
     )
     if not text:
         raise HTTPException(400, "a whisper needs some words")
-
     db.execute(
         "INSERT INTO messages (ghost_id, challenge_id, kind, body) VALUES (%s, %s, %s, %s)",
         (body.ghost_id, challenge_id, body.kind, text),
@@ -413,15 +533,14 @@ def send_message(challenge_id: int, body: NewMessage):
 @app.get("/challenges/{challenge_id}/questions")
 def list_questions(challenge_id: int):
     return with_names(db.query(
-        "SELECT id, ghost_id, question, answer FROM questions"
-        " WHERE challenge_id = %s ORDER BY id",
+        "SELECT id, ghost_id, question, answer FROM questions WHERE challenge_id = %s ORDER BY id",
         (challenge_id,),
     ))
 
 
 @app.post("/challenges/{challenge_id}/questions")
-def ask(challenge_id: int, body: NewQuestion, x_ghost_token: str = Header(default="")):
-    g = me(x_ghost_token)
+def ask(challenge_id: int, body: NewQuestion, x_token: str = Header(default="")):
+    _, g = candidate_from(x_token)
     challenge_or_404(challenge_id)
     if not body.question.strip():
         raise HTTPException(400, "ask something")
@@ -433,16 +552,15 @@ def ask(challenge_id: int, body: NewQuestion, x_ghost_token: str = Header(defaul
 
 
 @app.post("/questions/{question_id}/answer")
-def answer(question_id: int, body: Answer):
+def answer(question_id: int, body: Answer, x_token: str = Header(default="")):
     """The company answers. Everyone sees it, and the asker also gets it in their inbox."""
+    company = company_from(x_token)
     rows = db.query("SELECT * FROM questions WHERE id = %s", (question_id,))
     if not rows:
         raise HTTPException(404, "question not found")
     q = rows[0]
-    db.execute(
-        "UPDATE questions SET answer = %s WHERE id = %s",
-        (body.answer.strip(), question_id),
-    )
+    owned_challenge(q["challenge_id"], company)
+    db.execute("UPDATE questions SET answer = %s WHERE id = %s", (body.answer.strip(), question_id))
     db.execute(
         "INSERT INTO messages (ghost_id, challenge_id, kind, body) VALUES (%s, %s, %s, %s)",
         (q["ghost_id"], q["challenge_id"], "answer",
@@ -506,8 +624,6 @@ def match(body: MatchInput):
 def schedule():
     """Member 9. Picks the challenge windows that fit without overlapping."""
     rows = db.query("SELECT id, title, start_day, end_day FROM challenges WHERE NOT practice")
-    windows = [
-        {"id": r["id"], "title": r["title"], "start": r["start_day"], "end": r["end_day"]}
-        for r in rows
-    ]
+    windows = [{"id": r["id"], "title": r["title"], "start": r["start_day"], "end": r["end_day"]}
+               for r in rows]
     return scheduling.select_windows(windows)

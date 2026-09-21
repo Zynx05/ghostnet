@@ -7,6 +7,7 @@ plagiarism column is not a row of zeros during the demo.
     python seed.py
 """
 
+import auth
 import db
 
 SHARED_BLOCK = (
@@ -84,16 +85,24 @@ CHALLENGES = [
     },
 ]
 
-# The people behind the seeded entries. Names are made up. The real name is
-# optional in the product, so one of these leaves it blank on purpose.
-GHOSTS = [
-    ("quiet-falcon", "Quiet Falcon", "Bilal Ahmed"),
-    ("pale-otter", "Pale Otter", "Ayesha Khan"),
-    ("swift-heron", "Swift Heron", "Hira Sheikh"),
-    ("calm-lynx", "Calm Lynx", "Usman Tariq"),
-    ("sharp-moth", "Sharp Moth", "Sana Malik"),
-    ("bold-fox", "Bold Fox", ""),
+# Demo accounts. Every password is demo1234. Names are made up. The real
+# name is optional in the product, so one candidate leaves it blank on purpose.
+COMPANIES = [
+    ("northwind@demo.pk", "Northwind Retail", 10000),
+    ("vega@demo.pk", "Vega Logistics", 3000),
+    ("meridian@demo.pk", "Meridian Bank", 0),
 ]
+
+CANDIDATES = [
+    ("bilal@demo.pk", "quiet-falcon", "Quiet Falcon", "Bilal Ahmed"),
+    ("ayesha@demo.pk", "pale-otter", "Pale Otter", "Ayesha Khan"),
+    ("hira@demo.pk", "swift-heron", "Swift Heron", "Hira Sheikh"),
+    ("usman@demo.pk", "calm-lynx", "Calm Lynx", "Usman Tariq"),
+    ("sana@demo.pk", "sharp-moth", "Sharp Moth", "Sana Malik"),
+    ("farhan@demo.pk", "bold-fox", "Bold Fox", ""),
+]
+
+PASSWORD = "demo1234"
 
 SUBMISSIONS = [
     (1, "quiet-falcon",
@@ -162,18 +171,35 @@ def run():
     # data behind and the row ids stay predictable for the presentation.
     db.reset()
 
-    for i, (ghost_id, name, real_name) in enumerate(GHOSTS, start=1):
+    # One hash for every demo account. Hashing is deliberately slow, so doing
+    # it nine times would make the seed take a few seconds for no reason.
+    pw = auth.hash_password(PASSWORD)
+
+    company_ids = {}
+    for email, name, balance in COMPANIES:
+        company_ids[name] = db.execute(
+            "INSERT INTO users (email, password_hash, role, company_name, balance_pkr)"
+            " VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (email, pw, "company", name, balance),
+        )
+
+    for email, ghost_id, name, real_name in CANDIDATES:
+        user_id = db.execute(
+            "INSERT INTO users (email, password_hash, role) VALUES (%s, %s, %s) RETURNING id",
+            (email, pw, "candidate"),
+        )
         db.execute(
-            "INSERT INTO ghosts (ghost_id, name, token, real_name) VALUES (%s, %s, %s, %s)",
-            (ghost_id, name, "seed-token-%d" % i, real_name),
+            "INSERT INTO ghosts (ghost_id, user_id, name, real_name) VALUES (%s, %s, %s, %s)",
+            (ghost_id, user_id, name, real_name),
         )
 
     for c in CHALLENGES:
         db.execute(
-            "INSERT INTO challenges (title, company, statement, reward, start_day, end_day, practice)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (c["title"], c["company"], c["statement"], c["reward"],
-             c["start_day"], c["end_day"], c.get("practice", False)),
+            "INSERT INTO challenges (company_id, title, company, statement, reward,"
+            " start_day, end_day, practice)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (company_ids.get(c["company"]), c["title"], c["company"], c["statement"],
+             c["reward"], c["start_day"], c["end_day"], c.get("practice", False)),
         )
 
     for challenge_id, ghost_id, content in SUBMISSIONS:
@@ -182,8 +208,9 @@ def run():
             (challenge_id, ghost_id, content),
         )
 
-    print("seeded", len(GHOSTS), "ghosts,", len(CHALLENGES), "challenges and",
-          len(SUBMISSIONS), "submissions")
+    print("seeded", len(COMPANIES), "companies,", len(CANDIDATES), "candidates,",
+          len(CHALLENGES), "challenges and", len(SUBMISSIONS), "submissions")
+    print("every demo account uses the password", PASSWORD)
     print("database:", db.DATABASE_URL)
 
 

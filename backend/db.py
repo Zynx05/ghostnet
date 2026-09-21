@@ -20,14 +20,18 @@ Railway sets DATABASE_URL to a PostgreSQL address, so deployment is unaffected
 by the local default. CI runs the api job against a real PostgreSQL container,
 which is what stops the two paths drifting apart.
 
-Seven tables.
+Nine tables.
 
-ghosts       one row per person. The ghost id is the only identity the rest
-             of the system ever sees. The real name sits here, optional, and
-             the ranking queries never join to it, so hiding names is not a
-             rule somebody has to remember, it is simply absent from the SQL
-challenges   what a company posted. practice marks warm up challenges with
-             no company behind them
+users        email, password hash, role. A candidate or a company. Companies
+             carry a balance in rupees
+ghosts       one per candidate. The ghost id is the only identity the rest of
+             the system ever sees. The real name sits here, optional, and the
+             ranking queries never join to it, so hiding names is not a rule
+             somebody has to remember, it is simply absent from the SQL
+challenges   what a company posted, owned by that company. practice marks
+             warm ups with no company behind them
+unmasks      every time a company paid to see a real name. One row per
+             candidate per company per challenge, so nobody is charged twice
 submissions  anonymous work, one per ghost per challenge
 results      the scores produced by one ranking run
 practice     where a ghost would have ranked on a closed challenge. Never
@@ -59,17 +63,29 @@ IS_SQLITE = DATABASE_URL.startswith("sqlite")
 # dialects disagree, so they are filled in at import time.
 
 SCHEMA_TEMPLATE = """
+CREATE TABLE IF NOT EXISTS users (
+    id            {PK},
+    email         TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,
+    role          TEXT    NOT NULL,
+    token         TEXT    UNIQUE,
+    company_name  TEXT    NOT NULL DEFAULT '',
+    balance_pkr   INTEGER NOT NULL DEFAULT 0,
+    created_at    {TS}
+);
+
 CREATE TABLE IF NOT EXISTS ghosts (
     id          {PK},
     ghost_id    TEXT    NOT NULL UNIQUE,
+    user_id     INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     name        TEXT    NOT NULL,
-    token       TEXT    NOT NULL UNIQUE,
     real_name   TEXT    NOT NULL DEFAULT '',
     created_at  {TS}
 );
 
 CREATE TABLE IF NOT EXISTS challenges (
     id          {PK},
+    company_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
     title       TEXT    NOT NULL,
     company     TEXT    NOT NULL,
     statement   TEXT    NOT NULL,
@@ -124,6 +140,16 @@ CREATE TABLE IF NOT EXISTS messages (
     created_at    {TS}
 );
 
+CREATE TABLE IF NOT EXISTS unmasks (
+    id            {PK},
+    challenge_id  INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+    company_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    ghost_id      TEXT    NOT NULL REFERENCES ghosts(ghost_id) ON DELETE CASCADE,
+    charged_pkr   INTEGER NOT NULL,
+    created_at    {TS},
+    UNIQUE (challenge_id, company_id, ghost_id)
+);
+
 CREATE TABLE IF NOT EXISTS questions (
     id            {PK},
     challenge_id  INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
@@ -156,8 +182,8 @@ DIALECT = {
 
 SCHEMA = SCHEMA_TEMPLATE.format(**DIALECT[IS_SQLITE])
 
-TABLES = ["questions", "messages", "practice", "results", "submissions",
-          "challenges", "ghosts"]
+TABLES = ["questions", "unmasks", "messages", "practice", "results",
+          "submissions", "challenges", "ghosts", "users"]
 
 DROP_ALL = (
     ["DROP TABLE IF EXISTS " + t for t in TABLES]

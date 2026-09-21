@@ -6,6 +6,7 @@
 
 export interface Challenge {
   id: number;
+  company_id: number | null;
   title: string;
   company: string;
   statement: string;
@@ -50,13 +51,18 @@ export interface ProofStep {
 
 export interface RevealResponse {
   winner: RankedRow;
-  /** Empty when the winner never gave a name. masked says so directly. */
-  real_name: string;
-  masked: boolean;
   merkle_root: string;
   leaf: string;
   proof: ProofStep[];
   leaf_count: number;
+}
+
+export interface UnmaskResponse {
+  ghost_id: string;
+  masked: boolean;
+  real_name: string;
+  charged_pkr: number;
+  balance_pkr?: number;
 }
 
 export interface PracticeResult {

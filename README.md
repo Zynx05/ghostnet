@@ -2,9 +2,10 @@
 
 Hiring based on what you can do, not who you are.
 
-A company posts a real problem instead of a job advert. Anyone answers it under
-a ghost name. The system scores every submission, ranks them, and only then
-reveals who wrote the winning one.
+A company posts a real problem instead of a job advert. Candidates answer it
+under a ghost name. The system scores every entry and ranks them. Closing a
+challenge names the winning ghost for free. Seeing the person behind any ghost
+costs the company Rs 1,500, once per candidate.
 
 Design and Analysis of Algorithms project. University of Karachi, UBIT.
 
@@ -79,19 +80,46 @@ python -m pytest tests -v     # one test per algorithm
 python benchmark.py           # measured time next to the claimed big O
 ```
 
+## Accounts
+
+Two kinds. Sign up takes an email and a password.
+
+| Role | Gets | Can |
+| --- | --- | --- |
+| Candidate | A ghost name, generated | Enter challenges, practice, ask questions, read the inbox |
+| Company | A balance in rupees | Post, rank, close, tap, whisper, answer, unmask |
+
+Demo accounts, every password `demo1234`:
+
+| Email | Who | Note |
+| --- | --- | --- |
+| bilal@demo.pk | Candidate, Quiet Falcon | Has a real name set |
+| farhan@demo.pk | Candidate, Bold Fox | No real name. Stays masked even if unmasked |
+| northwind@demo.pk | Company, Northwind Retail | Rs 10,000 balance |
+| vega@demo.pk | Company, Vega Logistics | Rs 3,000, enough for two unmasks |
+| meridian@demo.pk | Company, Meridian Bank | Rs 0, to show the balance check |
+
+Money is demo money. The Add Rs 10,000 button on My challenges credits the
+account and charges nobody. A real launch puts JazzCash or Easypaisa there.
+
 ## The demo, in order
 
-1. **Challenges.** Open *Fix the cart total bug*. Four people answered it.
-2. **Submissions.** Every one is a ghost id. No name anywhere on the screen.
-3. **Rank submissions.** Every scoring algorithm runs in that one request.
-   Read the table left to right: relevance, quality, structure, copied, final.
-4. **Ghost 003 is buried.** Its plagiarism score is high because it copied a
-   block from ghost 002, and the longest copied passage column shows the exact
-   text that was lifted.
-5. **Reveal the winner.** The name appears for the first time, together with a
-   Merkle proof of the win.
-6. **Proof chain.** The win is now a block, linked by hash to the one before it.
-7. **Matching** and **Schedule** are shown on their own.
+1. Log in as **northwind@demo.pk**. My challenges shows the balance and one
+   challenge with four entries.
+2. Open *Fix the cart total bug*. Every entry is a ghost name. No person
+   anywhere on the screen.
+3. **Rank entries.** Every scoring algorithm runs in that one request. Read
+   the table left to right: relevance, quality, structure, copied, score.
+4. **Swift Heron is buried.** Its copied score is 87 percent because it lifted
+   a block from Pale Otter.
+5. **Close and announce winner.** The winner card names Quiet Falcon. Still
+   a ghost.
+6. **Unmask for Rs 1,500.** The name blurs in. The balance in the nav drops.
+   Press it again, no charge.
+7. Log out, log in as **bilal@demo.pk**. My Ghost shows the win sealed into
+   the Skill Proof chain, and the Inbox has anything Northwind sent.
+8. Practice and Leaderboard are self explanatory. Matching and Calendar are
+   at /matching and /schedule, off the nav, for the viva.
 
 ## Layout
 
@@ -99,13 +127,15 @@ python benchmark.py           # measured time next to the claimed big O
 ghostnet/
   backend/
     main.py            the API, thin on purpose
-    db.py              three tables. SQLite locally, PostgreSQL deployed
+    auth.py            sign up, log in, sessions, the balance
+    ghosts.py          ghost names
+    db.py              nine tables. SQLite locally, PostgreSQL deployed
     seed.py            demo data, including one deliberate copy
     benchmark.py       measured growth for the report
     algorithms/        nine algorithms, written by hand
     tests/             one test per algorithm
   frontend/
-    src/app/           five screens
+    src/app/           fifteen screens
     src/lib/           api client, shared types, merge sort in TypeScript
     src/components/    design system reused from an earlier project
   docs/                roadmap, design notes, viva sheet
@@ -156,6 +186,7 @@ The weights sit at the top of `algorithms/ranker.py` where anyone can read them.
 
 ## What this is not
 
-No login, no payments, no real blockchain network, and no machine learning. The
-MVP proves one claim only, that work can be ranked without knowing whose work it
-is, and everything that does not serve that claim was left out.
+No real payments, no email verification, no password reset, no real blockchain
+network, and no machine learning. The MVP proves one claim, that work can be
+ranked and sold on without knowing whose work it is, and everything that does
+not serve that claim was left out.

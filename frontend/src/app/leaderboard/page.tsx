@@ -2,19 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { readGhost } from '../../lib/ghost';
+import { useSession } from '../../lib/auth';
 import type { LeaderRow } from '../../lib/types';
 import { EmptyState, Flash, Skeleton, type FlashMessage } from '../../components/ui';
 
 export default function LeaderboardPage() {
   const [rows, setRows] = useState<LeaderRow[] | null>(null);
   const [flash, setFlash] = useState<FlashMessage>(null);
-  const myId = readGhost()?.ghost_id;
+  const myId = useSession()?.ghost_id;
 
   useEffect(() => {
-    api.leaderboard()
-      .then(setRows)
-      .catch(e => { setFlash({ text: e.message, err: true }); setRows([]); });
+    api.leaderboard().then(setRows).catch(e => { setFlash({ text: e.message, err: true }); setRows([]); });
   }, []);
 
   return (
@@ -23,14 +21,9 @@ export default function LeaderboardPage() {
         <h1 className="page-title">Leaderboard</h1>
         <div className="card-meta">Ghosts, by verified wins. Names only, never people.</div>
       </section>
-
       <Flash message={flash} />
       {rows === null && <div className="card"><Skeleton rows={5} /></div>}
-
-      {rows !== null && rows.length === 0 && (
-        <div className="card"><EmptyState title="Nobody has entered anything yet" /></div>
-      )}
-
+      {rows !== null && rows.length === 0 && <div className="card"><EmptyState title="Nobody has entered anything yet" /></div>}
       {rows !== null && rows.length > 0 && (
         <section className="card">
           <div className="table-wrap" style={{ marginTop: 0 }}>

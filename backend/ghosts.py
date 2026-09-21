@@ -1,13 +1,12 @@
 """
 Ghost identities.
 
-There is no login. The first time a browser visits, it asks for a ghost and
-keeps the token it gets back. From then on that token is the person. The name
-is generated, two words, and it is the only identity anyone else ever sees.
+Every candidate account gets one ghost. The name is generated, two words, and
+it is the only identity anyone else ever sees. The candidate never picks it,
+which is the point: nothing about it can be gamed or made to sound impressive.
 """
 
 import random
-import secrets
 
 import db
 
@@ -29,31 +28,28 @@ def make_name():
     return random.choice(ADJECTIVES) + " " + random.choice(ANIMALS)
 
 
-def create():
-    """Make a new ghost with a name nobody else has, and a secret token."""
+def create(user_id):
+    """Make a ghost for a new candidate, with a name nobody else has."""
     for _ in range(50):
         name = make_name()
         ghost_id = name.replace(" ", "-")
-        taken = db.query("SELECT 1 FROM ghosts WHERE ghost_id = %s", (ghost_id,))
-        if not taken:
+        if not db.query("SELECT 1 FROM ghosts WHERE ghost_id = %s", (ghost_id,)):
             break
     else:
         # 576 combinations and all taken. Add a number rather than give up.
         ghost_id = ghost_id + "-" + str(random.randint(100, 999))
         name = name + " " + ghost_id[-3:]
 
-    token = secrets.token_urlsafe(24)
     db.execute(
-        "INSERT INTO ghosts (ghost_id, name, token) VALUES (%s, %s, %s)",
-        (ghost_id, name.title(), token),
+        "INSERT INTO ghosts (ghost_id, user_id, name) VALUES (%s, %s, %s)",
+        (ghost_id, user_id, name.title()),
     )
-    return {"ghost_id": ghost_id, "name": name.title(), "token": token}
+    return {"ghost_id": ghost_id, "name": name.title()}
 
 
-def by_token(token):
-    """The ghost that owns this token, or None."""
+def for_user(user_id):
     rows = db.query(
-        "SELECT ghost_id, name, real_name FROM ghosts WHERE token = %s", (token,)
+        "SELECT ghost_id, name, real_name FROM ghosts WHERE user_id = %s", (user_id,)
     )
     return rows[0] if rows else None
 

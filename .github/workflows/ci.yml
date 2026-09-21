@@ -53,7 +53,7 @@ jobs:
       - name: Load the demo data
         run: python seed.py
         working-directory: backend
-      - name: Rank, reveal and read the chain
+      - name: Log in, rank, close, unmask and read the chain
         working-directory: backend
         run: |
           python - <<'PY'
@@ -63,7 +63,15 @@ jobs:
           with TestClient(main.app) as client:
               assert client.get("/health").json()["status"] == "ok"
 
-              results = client.post("/challenges/1/rank").json()["results"]
+              # Northwind owns challenge 1 and starts with ten thousand rupees.
+              company = client.post("/auth/login", json={
+                  "email": "northwind@demo.pk", "password": "demo1234"}).json()
+              H = {"X-Token": company["token"]}
+
+              # Ranking needs the owner. No token must be refused.
+              assert client.post("/challenges/1/rank").status_code == 401
+
+              results = client.post("/challenges/1/rank", headers=H).json()["results"]
               assert len(results) == 4
 
               # The seeded copy must come last. If a change to any scoring
@@ -71,8 +79,26 @@ jobs:
               worst = results[-1]
               assert worst["plagiarism"] > 0.5, worst
 
-              reveal = client.post("/challenges/1/reveal").json()
-              assert reveal["real_name"] == "Bilal Ahmed", reveal["real_name"]
+              # Closing names the ghost and never the person.
+              closed = client.post("/challenges/1/reveal", headers=H).json()
+              assert closed["winner"]["ghost_name"] == "Quiet Falcon"
+              assert "real_name" not in closed
+
+              # Seeing the person costs fifteen hundred, once.
+              first = client.post("/challenges/1/unmask", headers=H,
+                                  json={"ghost_id": "quiet-falcon"}).json()
+              assert first["real_name"] == "Bilal Ahmed", first
+              assert first["charged_pkr"] == 1500
+              again = client.post("/challenges/1/unmask", headers=H,
+                                  json={"ghost_id": "quiet-falcon"}).json()
+              assert again["charged_pkr"] == 0
+
+              # Another company cannot touch it.
+              vega = client.post("/auth/login", json={
+                  "email": "vega@demo.pk", "password": "demo1234"}).json()
+              assert client.post("/challenges/1/unmask",
+                                 headers={"X-Token": vega["token"]},
+                                 json={"ghost_id": "quiet-falcon"}).status_code == 403
 
               assert len(client.get("/chain").json()["blocks"]) == 1
           print("api checks passed")
