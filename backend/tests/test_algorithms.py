@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from algorithms import (
     tfidf, levenshtein, merge_sort, rabin_karp,
-    suffix_array, complexity, merkle, gale_shapley, scheduling,
+    suffix_array, complexity, merkle, gale_shapley, scheduling, ranker,
 )
 
 
@@ -31,6 +31,36 @@ def test_levenshtein_known_distance():
     assert levenshtein.edit_distance("kitten", "sitting") == 3
     assert levenshtein.edit_distance("abc", "abc") == 0
     assert levenshtein.similarity("abc", "abc") == 1.0
+
+
+def test_levenshtein_catches_a_paraphrased_copy():
+    original = (
+        "def validate_cart_total(items):\n"
+        "    if not items:\n"
+        "        return 0\n"
+        "    total = sum(i.price * i.quantity for i in items)\n"
+        "    return round(total, 2)\n"
+    )
+    # A few names changed to dodge an exact match. Still the same code.
+    paraphrase = original.replace("items", "cart_items").replace("total", "amount")
+    unrelated = "class RateLimiter:\n    def allow(self, client, now):\n        return True\n"
+    assert levenshtein.copy_similarity(paraphrase, original) > 0.75
+    # Two unrelated pieces of code share letters, and that must count as zero.
+    assert levenshtein.copy_similarity(unrelated, original) == 0.0
+
+
+def test_copy_check_only_looks_at_earlier_entries():
+    brief = "write a function that adds two numbers"
+    original = "def add(a, b):\n    return a + b\n# adds two numbers and returns the result\n"
+    copy = original.replace("add", "plus")
+    rows = ranker.score_all(brief, [
+        {"ghost_id": "first", "content": original},
+        {"ghost_id": "second", "content": copy},
+    ])
+    by_id = {r["ghost_id"]: r for r in rows}
+    # The person who submitted first is not blamed for being copied.
+    assert by_id["first"]["plagiarism"] == 0.0
+    assert by_id["second"]["plagiarism"] > 0.7
 
 
 def test_merge_sort_is_stable_and_descending():

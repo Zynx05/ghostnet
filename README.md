@@ -163,9 +163,13 @@ final = (0.45 x relevance + 0.25 x quality + 0.30 x structure) x (1 - plagiarism
 * **quality** edit distance to the problem statement, normalised
 * **structure** cyclomatic complexity, scored inside a healthy band of 3 to 10,
   so an essay with no logic and an unreadable function are both penalised
-* **plagiarism** the worst overlap against any other submission, found with a
-  rolling hash. It multiplies rather than adds, so copied work cannot win on
-  the strength of the other columns
+* **plagiarism** a two stage check against every entry that arrived earlier.
+  A rolling hash finds exact shared text fast. Where it finds any, edit
+  distance asks how much of the text is the same once a few words have been
+  changed, which catches the copy that renamed its variables. The higher of
+  the two is used. It multiplies rather than adds, so copied work cannot win
+  on the strength of the other columns, and the person who submitted first is
+  never blamed for being copied
 
 The weights sit at the top of `algorithms/ranker.py` where anyone can read them.
 
@@ -174,7 +178,7 @@ The weights sit at the top of `algorithms/ranker.py` where anyone can read them.
 | Member | Role | File they own | Algorithm |
 | --- | --- | --- | --- |
 | 1 | Algorithm Engineer | `algorithms/tfidf.py` | Cosine similarity over tf idf |
-| 2 | Backend Developer | `main.py`, `algorithms/levenshtein.py` | Edit distance |
+| 2 | Backend Developer | `main.py`, `algorithms/levenshtein.py` | Edit distance, for Quality and for catching paraphrased copies |
 | 3 | Frontend Developer | `frontend/src/`, `lib/mergeSort.ts` | Merge sort |
 | 4 | Database Engineer | `db.py`, `algorithms/rabin_karp.py` | Rabin Karp |
 | 5 | QA Engineer | `tests/`, `algorithms/suffix_array.py` | Suffix array |

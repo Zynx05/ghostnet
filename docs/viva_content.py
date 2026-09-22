@@ -37,7 +37,7 @@ SHARED = {
         ["Backend", "Python 3.12, FastAPI, Uvicorn, Pydantic"],
         ["Database", "PostgreSQL 16, psycopg 3, a small connection pool"],
         ["Frontend", "Next.js 15, React 19, TypeScript, plain CSS"],
-        ["Testing", "pytest, 12 tests, and none of them needs the database"],
+        ["Testing", "pytest, 14 tests, and none of them needs the database"],
         ["Automation", "GitHub Actions, three jobs, runs on every push"],
         ["Algorithms", "All written by hand. No library does the work for us"],
     ],
@@ -134,62 +134,74 @@ MEMBERS = [
         "algorithm": "Levenshtein edit distance",
         "opening": (
             "I built the API. Everything else talks to it. My algorithm is edit "
-            "distance. It counts the smallest number of letter changes needed "
-            "to turn one text into another."
+            "distance. It counts the smallest number of letter changes that turn "
+            "one text into another, and I use it for two jobs: how close an "
+            "entry is to the brief, and catching copies that changed a few words."
         ),
         "built": [
-            "Ten endpoints. List and create challenges, list and add answers, rank, read results, reveal, the proof chain, matching and scheduling.",
+            "The API. Accounts and sessions, challenges, entries, ranking, closing, paid unmasking, practice, messages, questions, the leaderboard and the proof chain.",
             "Pydantic models. A bad request is rejected with a clear message before any of our code runs.",
             "The lifespan handler. It opens the database pool when the server starts and closes it when the server stops.",
-            "CORS, so the frontend on port 3000 is allowed to call port 8000.",
-            "Edit distance, using only two rows instead of a full table.",
+            "Role checks. A candidate cannot post, a company cannot enter, and a company can only touch a challenge it posted.",
+            "Edit distance, using two rows instead of a full table, and the second stage of the copy check that uses it.",
         ],
         "files": [
-            ["backend/main.py", "the API, about 200 lines, no logic"],
-            ["backend/algorithms/levenshtein.py", "edit distance and the score"],
+            ["backend/main.py", "the API, about 700 lines, no logic"],
+            ["backend/algorithms/levenshtein.py", "edit distance, similarity, copy_similarity"],
         ],
         "tools": (
             "FastAPI, because it writes the API documentation for us from the "
-            "type hints. That means /docs is never out of date. Uvicorn runs "
-            "it. Pydantic checks the input. psycopg 3 talks to PostgreSQL."
+            "type hints, so /docs is never out of date. Uvicorn runs it. Pydantic "
+            "checks the input. psycopg 3 talks to PostgreSQL through a pool."
         ),
         "steps": [
-            "Make a table. Cell i, j holds the distance between the first i letters of one word and the first j letters of the other.",
+            "Make a table. Cell i, j holds the distance between the first i letters of one text and the first j letters of the other.",
             "Fill each cell with the smallest of three choices: insert a letter, delete a letter, or replace a letter. Replace is free if the two letters already match.",
-            "The answer is the bottom right cell.",
-            "Row i only needs row i minus 1. So we keep two rows and throw the rest away.",
+            "The answer is the bottom right cell. Row i only needs row i minus 1, so we keep two rows and throw the rest away.",
+            "Turn the distance into a score: one minus the distance divided by the longer text. Same text gives 1, nothing in common gives 0.",
         ],
         "cost": (
             "O(m x n) time. Every cell is filled once and there are m times n "
-            "cells. O(n) memory, because we only keep two rows at a time."
+            "cells. O(n) memory, because only two rows exist at a time. This is "
+            "the slowest algorithm in the project, which is exactly why it only "
+            "runs on pairs that a cheaper check has already flagged."
         ),
         "connects": (
-            "Every screen calls my routes. The rank route is the important one. "
-            "It loads the answers, gives them to ranker.py, saves the scores, "
-            "and sends them back. All the thinking happens in the algorithms "
-            "folder, not in my file."
+            "Copied is a two stage check. Rabin Karp sweeps every pair of entries "
+            "looking for exact shared text, which is fast. Wherever it finds any, "
+            "my edit distance asks how much of the text is still the same after a "
+            "few words were changed. The higher of the two becomes the Copied "
+            "score. Each entry is only compared against entries that arrived "
+            "before it, so the first person to submit is never blamed for being "
+            "copied."
         ),
         "problem": (
-            "The database pool was being opened and closed on every request, "
-            "which threw away the whole point of having one. It now opens once "
-            "when the server starts and closes when it stops, using a lifespan "
-            "handler. The old startup hook I first used had been removed from "
-            "FastAPI, so that had to change too."
+            "Rabin Karp only matches exact text. Somebody copied an answer and "
+            "renamed two variables, and the exact check dropped from 100 percent "
+            "to 61 percent, because every window that touched a renamed word "
+            "missed. Edit distance still saw 83 percent of the letters unchanged. "
+            "Running it on every pair would have been too slow, so it only runs "
+            "where the fast check found something. That is a filter then confirm "
+            "pattern, and it is how spam filters and virus scanners work too."
         ),
         "qa": [
             ("Show kitten turning into sitting.",
              "Replace k with s. Replace e with i. Add g at the end. Three changes. There is a test that checks this exact example."),
             ("Why dynamic programming and not simple recursion?",
              "Recursion solves the same small problem again and again. That is exponential time. The table solves each small problem once, which gives m times n."),
+            ("Why run Rabin Karp first and edit distance second?",
+             "Rabin Karp is linear in the text. Edit distance is m times n, so on fifty entries and a thousand pairs it would be the slow part of the whole ranking. Running it only on the pairs Rabin Karp flagged keeps the cost down and still catches the reworded copy."),
+            ("Why is there a floor of 0.6 on the copy score?",
+             "Any two pieces of code share letters. def, return, colons, spaces. Two completely unrelated entries still come out about 0.25 similar. Below the floor that is noise and counts as zero. Above it, the two texts really are the same text with edits."),
+            ("What if the original author gets flagged too?",
+             "They do not. Each entry is compared only against entries submitted before it. Whoever submitted first cannot have copied someone who came later, so their Copied score stays at zero and the copier takes the hit."),
             ("Why is your API so thin?",
-             "Each route checks the input, calls one module, and returns JSON. Because there is no logic in it, all twelve tests run with no server and no database."),
-            ("What if two people submit at the same moment?",
-             "Each request takes its own connection from the pool and its own transaction, so they do not clash. The ghost id is unique in the database, so a repeat would be rejected, not silently accepted."),
+             "Each route checks who is asking, calls one module, and returns JSON. Because there is no logic in it, all fourteen tests run with no server and no database."),
         ],
         "show": (
-            "Open http://localhost:8000/docs. FastAPI made that page from the "
-            "type hints, and the examiner can call any endpoint from it. Then "
-            "the Quality column in the ranking table."
+            "Open http://localhost:8000/docs, which FastAPI made from the type "
+            "hints. Then the Copied column on the ranking table: Swift Heron at "
+            "88 percent, and Pale Otter, who was copied from, at 13 percent."
         ),
     },
 

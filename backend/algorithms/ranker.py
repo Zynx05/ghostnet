@@ -18,7 +18,8 @@ WEIGHTS = {
 
 def score_all(problem_statement, submissions):
     """
-    submissions: list of dicts with ghost_id and content.
+    submissions: list of dicts with ghost_id and content, in the order they
+    arrived. Order matters: the copy check only looks backwards.
     Returns one row per submission, already ranked.
     """
     texts = [s["content"] for s in submissions]
@@ -28,13 +29,27 @@ def score_all(problem_statement, submissions):
 
     rows = []
     for i, s in enumerate(submissions):
-        others = texts[:i] + texts[i + 1:]
+        # Only entries that arrived before this one. The first person to submit
+        # cannot have copied somebody who submitted later, so the original author
+        # is never punished for being copied. Callers pass entries in arrival order.
+        others = texts[:i]
 
         # Member 2: distance to the problem statement as a rough quality proxy.
         quality = levenshtein.similarity(s["content"], problem_statement)
 
-        # Member 4: rolling hash sweep against every other submission.
-        plagiarism = rabin_karp.plagiarism_score(s["content"], others)
+        # Copied is a two stage check.
+        # Member 4: a rolling hash sweep finds exact shared text fast, O(n) a pair.
+        # Member 2: where the sweep found anything at all, edit distance asks how
+        # much of the text is the same once a few words have been changed. That
+        # is O(m x n) a pair, so it only runs on the pairs the sweep flagged.
+        exact = 0.0
+        fuzzy = 0.0
+        for other in others:
+            ratio = rabin_karp.overlap_ratio(s["content"], other)
+            exact = max(exact, ratio)
+            if ratio >= 0.1:
+                fuzzy = max(fuzzy, levenshtein.copy_similarity(s["content"], other))
+        plagiarism = max(exact, fuzzy)
 
         # Member 5: the single longest passage shared with anyone else.
         copied = suffix_array.longest_copied_passage(s["content"], others)

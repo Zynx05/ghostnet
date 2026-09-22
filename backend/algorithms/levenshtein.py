@@ -4,6 +4,12 @@ Levenshtein edit distance, solved with dynamic programming.
 
 Question it answers: how many single character edits turn one text into another?
 Complexity: O(m * n) time. Memory is O(n) because only two rows are kept.
+
+Two jobs in the ranking.
+    similarity        how close an entry is to the brief. The Quality column.
+    copy_similarity   how close an entry is to another entry. Feeds the Copied
+                      column, and catches the copy that Rabin Karp cannot: one
+                      where a few words were changed to dodge an exact match.
 """
 
 
@@ -29,6 +35,18 @@ def similarity(a, b):
     if longest == 0:
         return 1.0
     return 1 - (edit_distance(a, b) / longest)
+
+
+def copy_similarity(candidate, other, floor=0.6):
+    """
+    How much of one entry survives in another, for the plagiarism check.
+
+    Any two pieces of code or English share letters, so two unrelated entries
+    still come out around 0.25 similar. Below the floor that is noise and the
+    answer is zero. Above it, the two texts are the same text with edits.
+    """
+    score = similarity(candidate, other)
+    return score if score >= floor else 0.0
 
 
 def distance_matrix(texts):

@@ -345,8 +345,11 @@ def add_submission(challenge_id: int, body: Content, x_token: str = Header(defau
 def rank(challenge_id: int, x_token: str = Header(default="")):
     """The demo button. Every scoring algorithm runs inside this one call."""
     c = owned_challenge(challenge_id, company_from(x_token))
+    # Arrival order, because the copy check compares each entry only against
+    # the ones submitted before it.
     subs = db.query(
-        "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s", (challenge_id,)
+        "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s ORDER BY id",
+        (challenge_id,),
     )
     if not subs:
         raise HTTPException(400, "nothing has been entered yet")
@@ -480,8 +483,10 @@ def practice_attempt(challenge_id: int, body: Content, x_token: str = Header(def
         raise HTTPException(400, "the entry is empty")
 
     subs = db.query(
-        "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s", (challenge_id,)
+        "SELECT ghost_id, content FROM submissions WHERE challenge_id = %s ORDER BY id",
+        (challenge_id,),
     )
+    # The practice attempt is the newest entry, so it goes last.
     subs.append({"ghost_id": "__you__", "content": body.content})
     rows = ranker.score_all(c["statement"], subs)
     mine = next(r for r in rows if r["ghost_id"] == "__you__")
